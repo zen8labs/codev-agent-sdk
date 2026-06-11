@@ -354,7 +354,13 @@ def test_export_agent_settings_schema_emits_variant_tagged_sections() -> None:
     server_field = next(f for f in acp_section.fields if f.key == "acp_server")
     assert server_field.prominence is SettingProminence.CRITICAL
     server_choices = {c.value for c in server_field.choices}
-    assert server_choices == {"claude-code", "codex", "gemini-cli", "custom"}
+    assert server_choices == {
+        "claude-code",
+        "codex",
+        "gemini-cli",
+        "opencode",
+        "custom",
+    }
 
     command_field = next(f for f in acp_section.fields if f.key == "acp_command")
     assert command_field.prominence is SettingProminence.MINOR

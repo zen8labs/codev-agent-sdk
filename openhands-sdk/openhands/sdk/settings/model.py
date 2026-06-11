@@ -926,7 +926,7 @@ class ConversationSettings(BaseModel):
 
 AgentKind = Literal["openhands", "llm", "acp"]
 
-ACPServerKind = Literal["claude-code", "codex", "gemini-cli", "custom"]
+ACPServerKind = Literal["claude-code", "codex", "gemini-cli", "opencode", "custom"]
 """Known ACP backend servers the GUI can pick from.
 
 ``custom`` means the user supplies the raw ``acp_command`` themselves;
@@ -1197,7 +1197,7 @@ class ACPAgentSettings(AgentSettingsBase):
         ),
     )
     acp_server: ACPServerKind = Field(
-        default="claude-code",
+        default="opencode",
         description=(
             "Which ACP-compatible backend to launch. Each choice maps to a "
             "default subprocess command (see ``acp_command`` to override)."

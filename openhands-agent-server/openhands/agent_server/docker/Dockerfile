@@ -173,12 +173,13 @@ RUN set -ux; \
         if "$ACP_NODE_DIR/bin/npm" install -g \
             @agentclientprotocol/claude-agent-acp@0.30.0 \
             @zed-industries/codex-acp@0.15.0 \
-            @google/gemini-cli@0.38.0; then \
+            @google/gemini-cli@0.38.0 \
+            opencode-ai@1.17.3; then \
           # Create wrappers in /usr/local/bin that prepend ACP's Node 22 to PATH.
           # This ensures the ACP binary's #!/usr/bin/env node shebang resolves
           # to Node 22, while the repo's own node (NVM/system) stays untouched
           # for tests.
-          for bin in claude-agent-acp codex-acp gemini; do \
+          for bin in claude-agent-acp codex-acp gemini opencode; do \
             if [ -e "$ACP_NODE_DIR/bin/$bin" ]; then \
               printf '#!/bin/sh\nPATH="%s/bin:$PATH" exec "%s/bin/%s" "$@"\n' \
                 "$ACP_NODE_DIR" "$ACP_NODE_DIR" "$bin" \

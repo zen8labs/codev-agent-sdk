@@ -394,6 +394,7 @@ _GEMINI_FILE_SECRETS: tuple[ACPFileSecretSpec, ...] = (
 CLAUDE_AGENT_ACP_VERSION = "0.30.0"
 CODEX_ACP_VERSION = "0.15.0"
 GEMINI_CLI_VERSION = "0.38.0"
+OPENCODE_VERSION = "1.17.3"
 
 
 ACP_PROVIDERS: Mapping[str, ACPProviderInfo] = MappingProxyType(
@@ -471,6 +472,44 @@ ACP_PROVIDERS: Mapping[str, ACPProviderInfo] = MappingProxyType(
             # Gemini CLI has no dedicated config-dir var; it hard-codes
             # ``~/.gemini`` (ignoring XDG), so only HOME relocates its state.
             data_dir_env_var="HOME",
+        ),
+        "opencode": ACPProviderInfo(
+            key="opencode",
+            display_name="OpenCode",
+            default_command=(
+                "npx",
+                "-y",
+                f"opencode-ai@{OPENCODE_VERSION}",
+                "acp",
+            ),
+            # OpenCode reads credentials from its own config / auth.json, not a
+            # single provider env var. Model + provider routing (e.g. a LiteLLM
+            # bridge) are delivered via OPENCODE_CONFIG_CONTENT — inline JSON
+            # config (opencode Flag.OPENCODE_CONFIG_CONTENT) — which rides the
+            # conversation secrets -> subprocess env channel.
+            api_key_env_var=None,
+            base_url_env_var=None,
+            # OpenCode has no bypass/yolo mode (only ``build`` / ``plan``);
+            # not needed — the SDK ACP client auto-approves every
+            # session/request_permission regardless of mode.
+            default_session_mode="build",
+            agent_name_patterns=("opencode",),
+            # OpenCode exposes model switching only as the non-standard
+            # ``unstable_setSessionModel`` (and session/new ``configOptions``),
+            # not the standard ``session/set_model`` — both protocol model
+            # paths are disabled; the model is selected via config instead.
+            supports_set_session_model=False,
+            supports_runtime_model_switch=False,
+            session_meta_key=None,
+            # No curated list: effective models come from the user's own
+            # provider config (OPENCODE_CONFIG_CONTENT); the deploying
+            # application maps ``acp_model`` into the config's ``model`` field.
+            available_models=(),
+            default_model=None,
+            binary_name="opencode",
+            # Relocates ~/.local/share/opencode (auth.json, opencode.db) for
+            # per-conversation isolation under sandbox grouping.
+            data_dir_env_var="XDG_DATA_HOME",
         ),
     }
 )

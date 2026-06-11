@@ -19,7 +19,7 @@ from openhands.sdk.settings.acp_providers import (
 
 class TestACPProviderInfo:
     def test_known_providers_are_registered(self):
-        assert set(ACP_PROVIDERS) == {"claude-code", "codex", "gemini-cli"}
+        assert set(ACP_PROVIDERS) == {"claude-code", "codex", "gemini-cli", "opencode"}
 
     def test_all_entries_are_acp_provider_info(self):
         for info in ACP_PROVIDERS.values():
@@ -222,7 +222,14 @@ class TestProviderModelLists:
     """Verify the curated ``available_models`` / ``default_model`` fields."""
 
     def test_every_builtin_provider_has_available_models(self):
+        # opencode deliberately has no curated list: its effective models come
+        # from the user's own provider config (OPENCODE_CONFIG_CONTENT), and
+        # protocol-level model selection is unsupported (only the non-standard
+        # unstable_setSessionModel exists).
         for key, info in ACP_PROVIDERS.items():
+            if key == "opencode":
+                assert not info.available_models
+                continue
             assert info.available_models, f"{key}: available_models must not be empty"
 
     def test_available_models_entries_are_model_options(self):
