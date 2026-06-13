@@ -63,6 +63,12 @@ class ACPToolCallEvent(Event):
     raw_output: Any | None = None
     content: list[Any] | None = None
     is_error: bool = False
+    # Subagent session grouping — both fields are set to the same value for
+    # every event that belongs to one ACP subprocess invocation, so the
+    # frontend can group tool cards into a named session panel without
+    # needing to infer grouping from timestamps or event ordering.
+    subagent_session_id: str | None = None
+    agent_name: str | None = None
 
     @property
     def is_patch_edit(self) -> bool:

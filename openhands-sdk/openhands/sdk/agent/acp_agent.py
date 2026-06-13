@@ -22,6 +22,8 @@ import json
 import os
 import threading
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections.abc import Awaitable, Callable, Generator
 from concurrent.futures import Future
@@ -169,6 +171,14 @@ _ENV_CONFLICT_MAP: dict[str, frozenset[str]] = {
 # entropy to correlate across log lines for one conversation but not enough
 # to brute-force the full id.
 _SESSION_ID_LOG_SUFFIX_LEN: Final[int] = 8
+
+# OpenCode HTTP API base URL — the opencode binary always binds its REST API
+# to 127.0.0.1:4096 inside the container. Used post-prompt to fetch subagent
+# session tool calls that the ACP protocol never surfaces (see root-cause note
+# in _emit_subagent_tool_calls_from_http).
+_OPENCODE_HTTP_API_BASE: str = os.environ.get(
+    "OPENCODE_HTTP_API_BASE", "http://127.0.0.1:4096"
+)
 
 
 def _fingerprint_session_id(session_id: str | None) -> str:
@@ -1019,6 +1029,10 @@ class _OpenHandsACPBridge:
                 "raw_input": update.raw_input,
                 "raw_output": update.raw_output,
                 "content": _serialize_tool_content(update.content),
+                # Stamp with the ACP session id so the frontend can group all
+                # tool calls from the same subprocess invocation into one panel.
+                "subagent_session_id": session_id,
+                "agent_name": self._agent_name or None,
             }
             self._mask_tool_call_entry(entry)
             self.accumulated_tool_calls.append(entry)
@@ -1104,6 +1118,8 @@ class _OpenHandsACPBridge:
                 raw_output=raw_output,
                 content=tc.get("content"),
                 is_error=tc.get("status") == "failed",
+                subagent_session_id=tc.get("subagent_session_id"),
+                agent_name=tc.get("agent_name"),
             )
             self.on_event(event)
         except Exception:
@@ -2783,6 +2799,154 @@ class ACPAgent(AgentBase):
     def _prompt_response_was_cancelled(response: PromptResponse | None) -> bool:
         return response is not None and response.stop_reason == "cancelled"
 
+    def _emit_subagent_tool_calls_from_http(
+        self, on_event: ConversationCallbackType
+    ) -> None:
+        """Emit ACPToolCallEvent entries for tool calls executed by subagent sessions.
+
+        Root-cause context
+        ------------------
+        OpenCode's ``task`` tool spawns subagent sessions (``Session.create``)
+        that are **not** registered in its ACP session store.  When
+        ``message.part.updated`` fires for a subagent tool call, the ACP
+        handler calls ``tryGet(subagent_session_id)`` which returns ``null``,
+        so the handler returns early without ever sending a ``session/update``
+        notification to the Python SDK.  This means
+        ``_OpenHandsACPBridge.session_update`` is never called with a
+        ``ToolCallStart`` for any subagent tool call, and zero
+        ``ACPToolCallEvent`` entries appear in the UI for subagent work.
+
+        Fix strategy
+        ------------
+        After ``conn.prompt()`` completes we query OpenCode's REST HTTP API
+        (always at ``127.0.0.1:4096`` inside the sandbox) to:
+
+        1. ``GET /session/{session_id}/children`` — find all subagent sessions
+           whose ``parentID`` matches the main ACP session.
+        2. For each child, ``GET /session/{id}/message`` — fetch messages with
+           embedded ``parts`` arrays.
+        3. For each ``ToolPart`` (``type == "tool"``) emit an
+           ``ACPToolCallEvent`` so downstream consumers (the Cloud Agent UI)
+           can render the tool cards in a grouped subagent panel.
+
+        Events are emitted in message order, tools first within each message.
+        The existing ``on_event`` callback is used so the events land in the
+        normal event stream before the turn's ``FinishAction``.
+        """
+        session_id = self._session_id
+        if not session_id:
+            return
+        # Only OpenCode uses the task tool that spawns subagent sessions.
+        # Skip the HTTP poll for other ACP providers to avoid spurious
+        # connection errors (the port is only bound inside OpenCode sandboxes).
+        agent_name_lower = (self._agent_name or "").lower()
+        if "opencode" not in agent_name_lower and not os.environ.get(
+            "OPENCODE_HTTP_API_BASE"
+        ):
+            return
+        base = _OPENCODE_HTTP_API_BASE
+        try:
+            # Step 1: get child (subagent) sessions
+            with urllib.request.urlopen(
+                f"{base}/session/{session_id}/children", timeout=5
+            ) as resp:
+                children: list[dict[str, Any]] = json.loads(resp.read())
+            if not children:
+                return
+        except Exception as exc:
+            logger.debug(
+                "Could not fetch subagent children from OpenCode HTTP API: %s", exc
+            )
+            return
+
+        for child in children:
+            child_id = child.get("id")
+            agent_name = child.get("agent") or child.get("title") or child_id
+            child_title = child.get("title") or agent_name or child_id
+            if not child_id:
+                continue
+
+            # Emit a session-level event so this subagent always appears in
+            # the UI panel, even when it makes no tool calls (e.g. reasoning-only).
+            try:
+                on_event(
+                    ACPToolCallEvent(
+                        tool_call_id=f"session:{child_id}",
+                        title=child_title,
+                        status="completed",
+                        tool_kind=None,
+                        raw_input=None,
+                        raw_output=None,
+                        content=None,
+                        is_error=False,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                )
+            except Exception:
+                logger.debug(
+                    "Failed to emit session-level event for subagent %s", child_id
+                )
+
+            try:
+                # Step 2: fetch messages with embedded parts
+                with urllib.request.urlopen(
+                    f"{base}/session/{child_id}/message", timeout=5
+                ) as resp:
+                    messages: list[dict[str, Any]] = json.loads(resp.read())
+            except Exception as exc:
+                logger.debug(
+                    "Could not fetch messages for subagent %s: %s", child_id, exc
+                )
+                continue
+
+            for msg_envelope in messages:
+                parts: list[dict[str, Any]] = msg_envelope.get("parts", [])
+                for part in parts:
+                    if part.get("type") != "tool":
+                        continue
+                    state: dict[str, Any] = part.get("state", {})
+                    status = state.get("status", "completed")
+                    tool_name = part.get("tool", "")
+                    call_id = part.get("callID", part.get("id", ""))
+                    title = state.get("title") or tool_name
+                    raw_input = state.get("input")
+                    raw_output = state.get("output") or state.get("error")
+                    if isinstance(raw_output, str):
+                        raw_output = maybe_truncate(
+                            raw_output, truncate_after=MAX_ACP_CONTENT_CHARS
+                        )
+                    # Map OpenCode status to the ACPToolCallEvent status values
+                    mapped_status: str
+                    if status == "completed":
+                        mapped_status = "completed"
+                    elif status == "error":
+                        mapped_status = "failed"
+                    elif status == "running":
+                        mapped_status = "in_progress"
+                    else:
+                        mapped_status = status
+                    try:
+                        event = ACPToolCallEvent(
+                            tool_call_id=call_id,
+                            title=title,
+                            status=mapped_status,
+                            tool_kind=None,
+                            raw_input=raw_input,
+                            raw_output=raw_output,
+                            content=None,
+                            is_error=(mapped_status == "failed"),
+                            subagent_session_id=child_id,
+                            agent_name=agent_name,
+                        )
+                        on_event(event)
+                    except Exception:
+                        logger.debug(
+                            "Failed to emit subagent tool call event for %s",
+                            call_id,
+                            exc_info=True,
+                        )
+
     def _finalize_successful_turn(
         self,
         response: PromptResponse | None,
@@ -2811,6 +2975,14 @@ class ACPAgent(AgentBase):
         # server opened but never terminated so every ``started`` has its
         # matching terminal observation before the turn's FinishAction lands.
         self._flush_inflight_tool_calls_as_completed()
+
+        # Emit tool call events for subagent sessions created by OpenCode's
+        # ``task`` tool.  These are never surfaced via the ACP protocol because
+        # subagent sessions are not registered in OpenCode's ACP session store
+        # (``tryGet`` returns null → early return before ``toolStart`` is called
+        # → no ``session/update("tool_call")`` notification reaches the Python
+        # SDK).  We recover them post-hoc from OpenCode's REST HTTP API.
+        self._emit_subagent_tool_calls_from_http(on_event)
 
         # Re-mask the joined text at this persistence boundary: the chunks were
         # already masked individually as they streamed, but a secret split
