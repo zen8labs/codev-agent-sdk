@@ -17,6 +17,7 @@ See https://agentclientprotocol.com/protocol/overview
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import inspect
 import json
 import os
@@ -178,6 +179,18 @@ _SESSION_ID_LOG_SUFFIX_LEN: Final[int] = 8
 # in _emit_subagent_tool_calls_from_http).
 _OPENCODE_HTTP_API_BASE: str = os.environ.get(
     "OPENCODE_HTTP_API_BASE", "http://127.0.0.1:4096"
+)
+
+# How often (seconds) to poll OpenCode's REST API for in-progress subagent
+# tool calls *while* a prompt is running.  OpenCode subagent sessions never
+# surface via the ACP protocol (see root-cause note in
+# _emit_subagent_tool_calls_from_http), so without this live poll their tool
+# cards would only appear in a single burst once the whole turn finishes — a
+# multi-minute blind wait for the user.  The poll runs off the event loop (in a
+# worker thread) so a slow HTTP round-trip never stalls the prompt; 3s keeps the
+# UI feeling live without hammering the local API.
+_SUBAGENT_POLL_INTERVAL: float = float(
+    os.environ.get("OPENCODE_SUBAGENT_POLL_INTERVAL", "3.0")
 )
 
 
@@ -850,6 +863,20 @@ class _OpenHandsACPBridge:
         self.accumulated_text: list[str] = []
         self.accumulated_thoughts: list[str] = []
         self.accumulated_tool_calls: list[dict[str, Any]] = []
+        # Name of the ACP server (from InitializeResponse.agent_info), stamped
+        # onto every ToolCallStart entry so the frontend can label/group a
+        # subprocess's tool calls. Populated by ACPAgent after the init
+        # handshake; ``None`` until then (and in bare-bridge unit tests). Defined
+        # here because ``session_update`` reads it on the very first tool call —
+        # without it that access raises AttributeError and silently kills live
+        # tool-call emission for the whole turn.
+        self._agent_name: str | None = None
+        # The MAIN ACP session id (populated by ACPAgent after init). Tool calls
+        # whose session_id matches this belong to the main conversation and must
+        # NOT be tagged as a subagent (subagent_session_id=None) — otherwise they
+        # leak into a spurious "subagent" panel instead of the main chat. A
+        # session_id that differs (a real ACP sub-session) IS a subagent.
+        self._main_session_id: str | None = None
         self.on_token: Any = None  # ConversationTokenCallbackType | None
         # Live event sink — fired from session_update as ACP tool-call
         # updates arrive, so the event stream reflects real subprocess
@@ -1029,9 +1056,17 @@ class _OpenHandsACPBridge:
                 "raw_input": update.raw_input,
                 "raw_output": update.raw_output,
                 "content": _serialize_tool_content(update.content),
-                # Stamp with the ACP session id so the frontend can group all
-                # tool calls from the same subprocess invocation into one panel.
-                "subagent_session_id": session_id,
+                # Tag only *sub*-session tool calls with a subagent id. A tool
+                # call on the main session belongs to the main chat (None); one
+                # on a different session id is a real ACP sub-session and is
+                # grouped into its own panel. OpenCode's task-tool subagents
+                # never reach here (they don't emit notifications) — they are
+                # recovered separately via the HTTP poll.
+                "subagent_session_id": (
+                    session_id
+                    if self._main_session_id and session_id != self._main_session_id
+                    else None
+                ),
                 "agent_name": self._agent_name or None,
             }
             self._mask_tool_call_entry(entry)
@@ -1489,6 +1524,13 @@ class ACPAgent(AgentBase):
     _installed_suffix: str | None = PrivateAttr(default=None)
     _restart_session_on_next_turn: bool = PrivateAttr(default=False)
     _resumed_existing_session: bool = PrivateAttr(default=False)
+    # Dedup state for live subagent tool-call emission: maps a subagent
+    # ``tool_call_id`` (or ``session:<child_id>`` placeholder) to the last
+    # status already emitted this turn, so the periodic poll and the final
+    # post-prompt sweep re-emit an event only when it is new or its status
+    # changed (e.g. ``in_progress`` -> ``completed``). Reset per turn in
+    # ``_reset_client_for_turn``.
+    _subagent_emit_state: dict[str, str | None] = PrivateAttr(default_factory=dict)
 
     # -- Helpers -----------------------------------------------------------
 
@@ -2447,6 +2489,11 @@ class ACPAgent(AgentBase):
             self._available_models,
             self._model_override_applied,
         ) = self._executor.run_async(_init)
+        # Propagate the resolved server name + main session id to the bridge so
+        # live ToolCallStart entries carry the name and so main-session tool
+        # calls are not mistagged as subagents.
+        self._client._agent_name = self._agent_name
+        self._client._main_session_id = self._session_id
         self._working_dir = working_dir
 
     def _reset_client_for_turn(
@@ -2466,6 +2513,10 @@ class ACPAgent(AgentBase):
         ``_start_acp_server`` (conversation-stable), not here.
         """
         self._client.reset()
+        # Fresh subagent dedup state so a new turn (or retry) re-streams the
+        # subagent tool cards from scratch rather than suppressing them as
+        # "already emitted" against the previous turn's state.
+        self._subagent_emit_state = {}
         self._client.on_token = on_token
         self._client.on_event = on_event
         self._client.on_activity = self._on_activity
@@ -2717,17 +2768,29 @@ class ACPAgent(AgentBase):
         ``_finalize_successful_turn`` already accepts ``PromptResponse | None``.
         """
         usage_sync = self._client.prepare_usage_sync(self._session_id or "")
-        response = await self._conn.prompt(prompt_blocks, self._session_id)
-        if self._client.get_turn_usage_update(self._session_id or "") is None:
-            try:
-                await asyncio.wait_for(usage_sync.wait(), timeout=_USAGE_UPDATE_TIMEOUT)
-            except TimeoutError:
-                logger.warning(
-                    "UsageUpdate not received within %.1fs for session %s",
-                    _USAGE_UPDATE_TIMEOUT,
-                    _fingerprint_session_id(self._session_id),
-                )
-        return response
+        # Stream OpenCode subagent tool cards live for the duration of this
+        # prompt. The poller runs on the portal loop (here) so its on_event
+        # emissions stay serialized with the bridge's live tool-call emissions;
+        # it is always torn down before the prompt round-trip returns.
+        poller = asyncio.ensure_future(self._subagent_poll_loop())
+        try:
+            response = await self._conn.prompt(prompt_blocks, self._session_id)
+            if self._client.get_turn_usage_update(self._session_id or "") is None:
+                try:
+                    await asyncio.wait_for(
+                        usage_sync.wait(), timeout=_USAGE_UPDATE_TIMEOUT
+                    )
+                except TimeoutError:
+                    logger.warning(
+                        "UsageUpdate not received within %.1fs for session %s",
+                        _USAGE_UPDATE_TIMEOUT,
+                        _fingerprint_session_id(self._session_id),
+                    )
+            return response
+        finally:
+            poller.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await poller
 
     def _idle_timeout_message(self) -> str:
         return (
@@ -2799,51 +2862,40 @@ class ACPAgent(AgentBase):
     def _prompt_response_was_cancelled(response: PromptResponse | None) -> bool:
         return response is not None and response.stop_reason == "cancelled"
 
-    def _emit_subagent_tool_calls_from_http(
-        self, on_event: ConversationCallbackType
-    ) -> None:
-        """Emit ACPToolCallEvent entries for tool calls executed by subagent sessions.
+    def _subagents_pollable(self) -> bool:
+        """Whether this turn should poll OpenCode's HTTP API for subagents.
 
-        Root-cause context
-        ------------------
-        OpenCode's ``task`` tool spawns subagent sessions (``Session.create``)
-        that are **not** registered in its ACP session store.  When
-        ``message.part.updated`` fires for a subagent tool call, the ACP
-        handler calls ``tryGet(subagent_session_id)`` which returns ``null``,
-        so the handler returns early without ever sending a ``session/update``
-        notification to the Python SDK.  This means
-        ``_OpenHandsACPBridge.session_update`` is never called with a
-        ``ToolCallStart`` for any subagent tool call, and zero
-        ``ACPToolCallEvent`` entries appear in the UI for subagent work.
-
-        Fix strategy
-        ------------
-        After ``conn.prompt()`` completes we query OpenCode's REST HTTP API
-        (always at ``127.0.0.1:4096`` inside the sandbox) to:
-
-        1. ``GET /session/{session_id}/children`` — find all subagent sessions
-           whose ``parentID`` matches the main ACP session.
-        2. For each child, ``GET /session/{id}/message`` — fetch messages with
-           embedded ``parts`` arrays.
-        3. For each ``ToolPart`` (``type == "tool"``) emit an
-           ``ACPToolCallEvent`` so downstream consumers (the Cloud Agent UI)
-           can render the tool cards in a grouped subagent panel.
-
-        Events are emitted in message order, tools first within each message.
-        The existing ``on_event`` callback is used so the events land in the
-        normal event stream before the turn's ``FinishAction``.
+        Only OpenCode's ``task`` tool spawns subagent sessions, and its REST
+        API port is only bound inside OpenCode sandboxes — polling other ACP
+        providers just yields spurious connection errors.  The env override
+        exists for tests / non-standard deployments.
         """
-        session_id = self._session_id
-        if not session_id:
-            return
-        # Only OpenCode uses the task tool that spawns subagent sessions.
-        # Skip the HTTP poll for other ACP providers to avoid spurious
-        # connection errors (the port is only bound inside OpenCode sandboxes).
         agent_name_lower = (self._agent_name or "").lower()
-        if "opencode" not in agent_name_lower and not os.environ.get(
-            "OPENCODE_HTTP_API_BASE"
-        ):
-            return
+        return "opencode" in agent_name_lower or bool(
+            os.environ.get("OPENCODE_HTTP_API_BASE")
+        )
+
+    def _fetch_subagent_tool_call_events(self) -> list[ACPToolCallEvent]:
+        """Fetch (without emitting) ACPToolCallEvents for subagent sessions.
+
+        Blocking HTTP against OpenCode's REST API — must be called from a worker
+        thread (``run_in_executor``) when on the portal loop so a slow round-trip
+        never stalls the in-flight prompt or its ``session_update`` notifications.
+        For each child subagent it returns, in order: a ``session:`` card (the
+        running indicator shown in the main chat), a ``prompt:`` card (the task
+        it received), its tool-call cards, and a ``response:`` card (its answer).
+        All share the child's ``subagent_session_id`` so the frontend groups
+        them into one panel. De-duplication and the actual ``on_event`` emission
+        are handled by :meth:`_emit_subagent_tool_call_events`, so one fetch can
+        drive both the periodic live poll and the post-prompt final sweep.
+
+        See :meth:`_emit_subagent_tool_calls_from_http` for the root-cause
+        context on why subagent tool calls are invisible to the ACP protocol.
+        """
+        events: list[ACPToolCallEvent] = []
+        session_id = self._session_id
+        if not session_id or not self._subagents_pollable():
+            return events
         base = _OPENCODE_HTTP_API_BASE
         try:
             # Step 1: get child (subagent) sessions
@@ -2852,12 +2904,12 @@ class ACPAgent(AgentBase):
             ) as resp:
                 children: list[dict[str, Any]] = json.loads(resp.read())
             if not children:
-                return
+                return events
         except Exception as exc:
             logger.debug(
                 "Could not fetch subagent children from OpenCode HTTP API: %s", exc
             )
-            return
+            return events
 
         for child in children:
             child_id = child.get("id")
@@ -2866,30 +2918,10 @@ class ACPAgent(AgentBase):
             if not child_id:
                 continue
 
-            # Emit a session-level event so this subagent always appears in
-            # the UI panel, even when it makes no tool calls (e.g. reasoning-only).
+            # Step 2: fetch this subagent's messages (embedded ``parts``) and
+            # split them into the prompt it received, the tool calls it made,
+            # and the response it produced.
             try:
-                on_event(
-                    ACPToolCallEvent(
-                        tool_call_id=f"session:{child_id}",
-                        title=child_title,
-                        status="completed",
-                        tool_kind=None,
-                        raw_input=None,
-                        raw_output=None,
-                        content=None,
-                        is_error=False,
-                        subagent_session_id=child_id,
-                        agent_name=agent_name,
-                    )
-                )
-            except Exception:
-                logger.debug(
-                    "Failed to emit session-level event for subagent %s", child_id
-                )
-
-            try:
-                # Step 2: fetch messages with embedded parts
                 with urllib.request.urlopen(
                     f"{base}/session/{child_id}/message", timeout=5
                 ) as resp:
@@ -2898,17 +2930,35 @@ class ACPAgent(AgentBase):
                 logger.debug(
                     "Could not fetch messages for subagent %s: %s", child_id, exc
                 )
-                continue
+                messages = []
 
+            tool_events: list[ACPToolCallEvent] = []
+            prompt_text = ""
+            response_chunks: list[str] = []
             for msg_envelope in messages:
+                role = self._opencode_message_role(msg_envelope)
                 parts: list[dict[str, Any]] = msg_envelope.get("parts", [])
                 for part in parts:
-                    if part.get("type") != "tool":
+                    ptype = part.get("type")
+                    if ptype == "text":
+                        text = part.get("text")
+                        if not isinstance(text, str) or not text.strip():
+                            continue
+                        # The first user message is the task the main agent sent;
+                        # assistant text is the subagent's answer back.
+                        if role == "user" and not prompt_text:
+                            prompt_text = text
+                        elif role == "assistant":
+                            response_chunks.append(text)
+                        continue
+                    if ptype != "tool":
                         continue
                     state: dict[str, Any] = part.get("state", {})
                     status = state.get("status", "completed")
                     tool_name = part.get("tool", "")
                     call_id = part.get("callID", part.get("id", ""))
+                    if not call_id:
+                        continue
                     title = state.get("title") or tool_name
                     raw_input = state.get("input")
                     raw_output = state.get("output") or state.get("error")
@@ -2926,8 +2976,8 @@ class ACPAgent(AgentBase):
                         mapped_status = "in_progress"
                     else:
                         mapped_status = status
-                    try:
-                        event = ACPToolCallEvent(
+                    tool_events.append(
+                        ACPToolCallEvent(
                             tool_call_id=call_id,
                             title=title,
                             status=mapped_status,
@@ -2939,13 +2989,180 @@ class ACPAgent(AgentBase):
                             subagent_session_id=child_id,
                             agent_name=agent_name,
                         )
-                        on_event(event)
-                    except Exception:
-                        logger.debug(
-                            "Failed to emit subagent tool call event for %s",
-                            call_id,
-                            exc_info=True,
-                        )
+                    )
+
+            response_text = "".join(response_chunks).strip()
+            # The subagent is still working if a tool is mid-flight or it hasn't
+            # produced its final answer yet. This drives the spinner on the
+            # sidebar button and the main-view "task running" card.
+            session_active = (
+                any(te.status == "in_progress" for te in tool_events)
+                or not response_text
+            )
+
+            # 1. Session card — carries no body, so the MAIN chat shows only a
+            #    compact "<task> running/done" indicator, while the subagent's
+            #    internals (prompt/tools/response) stay inside its own panel.
+            #    ``tool_call_id`` is the ``session:`` sentinel the frontend uses
+            #    to keep this card in the main view and out of the per-session
+            #    message list.
+            events.append(
+                ACPToolCallEvent(
+                    tool_call_id=f"session:{child_id}",
+                    title=child_title,
+                    status="in_progress" if session_active else "completed",
+                    tool_kind=None,
+                    raw_input=None,
+                    raw_output=None,
+                    content=None,
+                    is_error=False,
+                    subagent_session_id=child_id,
+                    agent_name=agent_name,
+                )
+            )
+            # 2. Prompt the main agent sent to this subagent.
+            if prompt_text:
+                events.append(
+                    ACPToolCallEvent(
+                        tool_call_id=f"prompt:{child_id}",
+                        title="Prompt",
+                        status="completed",
+                        tool_kind=None,
+                        raw_input=None,
+                        raw_output=maybe_truncate(
+                            prompt_text, truncate_after=MAX_ACP_CONTENT_CHARS
+                        ),
+                        content=None,
+                        is_error=False,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                )
+            # 3. The subagent's own tool calls (in message order).
+            events.extend(tool_events)
+            # 4. The subagent's response back to the main agent.
+            if response_text:
+                events.append(
+                    ACPToolCallEvent(
+                        tool_call_id=f"response:{child_id}",
+                        title="Response",
+                        status="completed",
+                        tool_kind=None,
+                        raw_input=None,
+                        raw_output=maybe_truncate(
+                            response_text, truncate_after=MAX_ACP_CONTENT_CHARS
+                        ),
+                        content=None,
+                        is_error=False,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                )
+        return events
+
+    @staticmethod
+    def _opencode_message_role(msg_envelope: dict[str, Any]) -> str | None:
+        """Best-effort extraction of an OpenCode message's role.
+
+        OpenCode's ``/session/{id}/message`` returns ``{info: {role, ...},
+        parts: [...]}``; older/other shapes put ``role`` at the top level. Both
+        are tolerated, returning ``None`` when neither is present.
+        """
+        info = msg_envelope.get("info")
+        if isinstance(info, dict) and info.get("role"):
+            return str(info["role"])
+        role = msg_envelope.get("role")
+        return str(role) if role else None
+
+    def _emit_subagent_tool_call_events(
+        self,
+        events: list[ACPToolCallEvent],
+        on_event: ConversationCallbackType,
+    ) -> None:
+        """Emit subagent tool-call events, skipping ones already sent unchanged.
+
+        ``_subagent_emit_state`` maps each event's ``tool_call_id`` to the last
+        status emitted this turn.  An event is re-emitted only when it is new or
+        its status changed (``in_progress`` -> ``completed`` / ``failed``), so a
+        repeated poll surfaces a live ``in_progress`` card that later flips to its
+        terminal state without flooding the (persisted, network-relayed) stream
+        with identical events.  The frontend dedupes by ``tool_call_id`` and
+        renders the latest status in place.
+        """
+        for event in events:
+            key = event.tool_call_id
+            if self._subagent_emit_state.get(key) == event.status:
+                continue
+            self._subagent_emit_state[key] = event.status
+            try:
+                on_event(event)
+            except Exception:
+                logger.debug(
+                    "Failed to emit subagent tool call event for %s",
+                    key,
+                    exc_info=True,
+                )
+
+    async def _subagent_poll_loop(self) -> None:
+        """Stream in-progress OpenCode subagent tool calls while a prompt runs.
+
+        Spawned on the portal loop by :meth:`_do_acp_prompt` and cancelled when
+        the prompt returns.  OpenCode subagent sessions never emit ACP
+        ``session/update`` notifications (see
+        :meth:`_emit_subagent_tool_calls_from_http`), so without this poll their
+        tool cards would only appear in a single burst once the whole turn
+        finishes — a multi-minute blind wait.  Each tick fetches the current
+        subagent state over HTTP in a worker thread (keeping the event loop free
+        to service the prompt), then emits new / status-changed events via the
+        turn's ``on_event`` sink — the same sink and thread the bridge uses for
+        live main-agent tool calls, so emissions stay serialized.
+        """
+        on_event = self._client.on_event
+        if on_event is None or not self._subagents_pollable():
+            return
+        loop = asyncio.get_event_loop()
+        while True:
+            await asyncio.sleep(_SUBAGENT_POLL_INTERVAL)
+            try:
+                events = await loop.run_in_executor(
+                    None, self._fetch_subagent_tool_call_events
+                )
+            except Exception:
+                logger.debug("Subagent poll failed", exc_info=True)
+                continue
+            self._emit_subagent_tool_call_events(events, on_event)
+
+    def _emit_subagent_tool_calls_from_http(
+        self, on_event: ConversationCallbackType
+    ) -> None:
+        """Post-prompt sweep of tool calls executed by subagent sessions.
+
+        Root-cause context
+        ------------------
+        OpenCode's ``task`` tool spawns subagent sessions (``Session.create``)
+        that are **not** registered in its ACP session store.  When
+        ``message.part.updated`` fires for a subagent tool call, the ACP
+        handler calls ``tryGet(subagent_session_id)`` which returns ``null``,
+        so the handler returns early without ever sending a ``session/update``
+        notification to the Python SDK.  This means
+        ``_OpenHandsACPBridge.session_update`` is never called with a
+        ``ToolCallStart`` for any subagent tool call, and zero
+        ``ACPToolCallEvent`` entries appear in the UI for subagent work.
+
+        Fix strategy
+        ------------
+        While the prompt runs, :meth:`_subagent_poll_loop` streams subagent tool
+        cards live by polling OpenCode's REST HTTP API (always at
+        ``127.0.0.1:4096`` inside the sandbox).  This method runs the same fetch
+        one final time after ``conn.prompt()`` returns, so any tool call that was
+        still ``in_progress`` at the last poll — or landed in the gap between the
+        last poll and the prompt completing — is flushed to its terminal state
+        before the turn's ``FinishAction``.  Shared ``_subagent_emit_state``
+        dedup means this sweep only emits what the live poll has not already sent.
+        """
+        self._emit_subagent_tool_call_events(
+            self._fetch_subagent_tool_call_events(), on_event
+        )
 
     def _finalize_successful_turn(
         self,

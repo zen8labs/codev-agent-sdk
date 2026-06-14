@@ -7991,3 +7991,269 @@ class TestACPStepMasksPersistedTurn:
         )
         assert "supersecret" not in finish.action.message
         assert finish.action.message == "the value is <secret-hidden> now"
+
+
+class TestACPSubagentLiveStreaming:
+    """Live streaming of OpenCode subagent tool calls (the ``task`` tool).
+
+    Subagent sessions never surface via the ACP protocol, so the agent polls
+    OpenCode's REST API while the prompt runs and emits ACPToolCallEvents as the
+    subagent works — instead of a single end-of-turn burst.
+    """
+
+    def _opencode_agent(self) -> ACPAgent:
+        agent = _make_agent()
+        agent._session_id = "sess-main"
+        agent._agent_name = "opencode"
+        agent._subagent_emit_state = {}
+        return agent
+
+    def test_emit_dedups_unchanged_and_re_emits_on_status_change(self) -> None:
+        agent = self._opencode_agent()
+        emitted: list[ACPToolCallEvent] = []
+
+        def on_event(e: Any) -> None:
+            emitted.append(e)
+
+        def ev(status: str) -> ACPToolCallEvent:
+            return ACPToolCallEvent(
+                tool_call_id="call-1",
+                title="bash",
+                status=status,  # type: ignore[arg-type]
+                tool_kind=None,
+                raw_input=None,
+                raw_output=None,
+                content=None,
+                is_error=(status == "failed"),
+                subagent_session_id="child-1",
+                agent_name="explore",
+            )
+
+        # First sighting: emitted. Repeat of same status: suppressed.
+        agent._emit_subagent_tool_call_events([ev("in_progress")], on_event)
+        agent._emit_subagent_tool_call_events([ev("in_progress")], on_event)
+        # Status transition: re-emitted.
+        agent._emit_subagent_tool_call_events([ev("completed")], on_event)
+
+        assert [e.status for e in emitted] == ["in_progress", "completed"]
+
+    def test_fetch_skips_non_opencode_providers(self) -> None:
+        agent = self._opencode_agent()
+        agent._agent_name = "claude-agent-acp"
+        with patch.dict("os.environ", {}, clear=False):
+            # Ensure the env override is not set for this assertion.
+            import os
+
+            os.environ.pop("OPENCODE_HTTP_API_BASE", None)
+            assert agent._fetch_subagent_tool_call_events() == []
+
+    def test_fetch_maps_status_and_orders_events(self) -> None:
+        agent = self._opencode_agent()
+
+        children = [{"id": "child-1", "agent": "explore", "title": "explore"}]
+        messages = [
+            {
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "bash",
+                        "callID": "call-1",
+                        "state": {
+                            "status": "running",
+                            "title": "ls",
+                            "input": {"command": "ls"},
+                        },
+                    },
+                    {
+                        "type": "tool",
+                        "tool": "read",
+                        "callID": "call-2",
+                        "state": {"status": "error", "error": "boom"},
+                    },
+                ]
+            }
+        ]
+
+        class _Resp:
+            def __init__(self, payload: Any) -> None:
+                self._payload = payload
+
+            def read(self) -> bytes:
+                return json.dumps(self._payload).encode()
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *a: Any) -> None:
+                return None
+
+        def fake_urlopen(url: str, timeout: int = 5) -> _Resp:
+            if url.endswith("/children"):
+                return _Resp(children)
+            return _Resp(messages)
+
+        with patch(
+            "openhands.sdk.agent.acp_agent.urllib.request.urlopen", fake_urlopen
+        ):
+            events = agent._fetch_subagent_tool_call_events()
+
+        # session-level placeholder first, then the two tool parts in order
+        assert [e.tool_call_id for e in events] == [
+            "session:child-1",
+            "call-1",
+            "call-2",
+        ]
+        assert events[1].status == "in_progress"  # running -> in_progress
+        assert events[2].status == "failed"  # error -> failed
+        assert events[2].is_error is True
+        assert all(e.subagent_session_id == "child-1" for e in events)
+
+
+class TestACPSubagentGrouping:
+    """Subagent grouping: main-session calls stay in the main chat; subagent
+    sessions carry their own prompt / tool calls / response."""
+
+    def _opencode_agent(self) -> ACPAgent:
+        agent = _make_agent()
+        agent._session_id = "sess-main"
+        agent._agent_name = "opencode"
+        agent._subagent_emit_state = {}
+        return agent
+
+    @pytest.mark.asyncio
+    async def test_main_session_tool_call_not_tagged_as_subagent(self) -> None:
+        from acp.schema import ToolCallStart
+
+        client = _OpenHandsACPBridge()
+        client._main_session_id = "sess-main"
+
+        start = MagicMock(spec=ToolCallStart)
+        start.tool_call_id = "tc-main"
+        start.title = "Read"
+        start.kind = "read"
+        start.status = "in_progress"
+        start.raw_input = None
+        start.raw_output = None
+        start.content = None
+
+        await client.session_update("sess-main", start)
+        assert client.accumulated_tool_calls[0]["subagent_session_id"] is None
+
+    @pytest.mark.asyncio
+    async def test_sub_session_tool_call_is_tagged(self) -> None:
+        from acp.schema import ToolCallStart
+
+        client = _OpenHandsACPBridge()
+        client._main_session_id = "sess-main"
+
+        start = MagicMock(spec=ToolCallStart)
+        start.tool_call_id = "tc-sub"
+        start.title = "Read"
+        start.kind = "read"
+        start.status = "in_progress"
+        start.raw_input = None
+        start.raw_output = None
+        start.content = None
+
+        await client.session_update("sess-sub", start)
+        assert client.accumulated_tool_calls[0]["subagent_session_id"] == "sess-sub"
+
+    def test_fetch_emits_prompt_tools_response_and_running_session(self) -> None:
+        agent = self._opencode_agent()
+        children = [{"id": "child-1", "agent": "explore", "title": "Explore repo"}]
+        messages = [
+            {
+                "info": {"role": "user"},
+                "parts": [{"type": "text", "text": "Go explore the repo"}],
+            },
+            {
+                "info": {"role": "assistant"},
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "grep",
+                        "callID": "call-1",
+                        "state": {"status": "completed", "title": "grep foo"},
+                    },
+                    {"type": "text", "text": "Here is what I found."},
+                ],
+            },
+        ]
+
+        class _Resp:
+            def __init__(self, payload: Any) -> None:
+                self._payload = payload
+
+            def read(self) -> bytes:
+                return json.dumps(self._payload).encode()
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *a: Any) -> None:
+                return None
+
+        def fake_urlopen(url: str, timeout: int = 5) -> _Resp:
+            return _Resp(children if url.endswith("/children") else messages)
+
+        with patch(
+            "openhands.sdk.agent.acp_agent.urllib.request.urlopen", fake_urlopen
+        ):
+            events = agent._fetch_subagent_tool_call_events()
+
+        by_id = {e.tool_call_id: e for e in events}
+        # session card + prompt + tool + response, all grouped under child-1
+        assert set(by_id) == {
+            "session:child-1",
+            "prompt:child-1",
+            "call-1",
+            "response:child-1",
+        }
+        assert all(e.subagent_session_id == "child-1" for e in events)
+        # Response present + no running tool => session done (not in_progress)
+        assert by_id["session:child-1"].status == "completed"
+        assert by_id["prompt:child-1"].raw_output == "Go explore the repo"
+        assert by_id["response:child-1"].raw_output == "Here is what I found."
+
+    def test_fetch_session_running_until_response(self) -> None:
+        agent = self._opencode_agent()
+        children = [{"id": "child-2", "agent": "explore", "title": "Explore"}]
+        messages = [
+            {
+                "info": {"role": "assistant"},
+                "parts": [
+                    {
+                        "type": "tool",
+                        "tool": "grep",
+                        "callID": "c-run",
+                        "state": {"status": "running"},
+                    }
+                ],
+            }
+        ]
+
+        class _Resp:
+            def __init__(self, payload: Any) -> None:
+                self._payload = payload
+
+            def read(self) -> bytes:
+                return json.dumps(self._payload).encode()
+
+            def __enter__(self) -> _Resp:
+                return self
+
+            def __exit__(self, *a: Any) -> None:
+                return None
+
+        def fake_urlopen(url: str, timeout: int = 5) -> _Resp:
+            return _Resp(children if url.endswith("/children") else messages)
+
+        with patch(
+            "openhands.sdk.agent.acp_agent.urllib.request.urlopen", fake_urlopen
+        ):
+            events = agent._fetch_subagent_tool_call_events()
+
+        by_id = {e.tool_call_id: e for e in events}
+        # No response yet and a running tool => session card spins
+        assert by_id["session:child-2"].status == "in_progress"
+        assert "response:child-2" not in by_id
