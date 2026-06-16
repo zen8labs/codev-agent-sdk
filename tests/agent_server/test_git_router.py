@@ -233,8 +233,13 @@ async def test_git_changes_missing_path_param(client):
 
 
 @pytest.mark.asyncio
-async def test_git_changes_query_param_absolute_path(client):
-    """Test git changes with query parameter and absolute path (main fix use case)."""
+async def test_git_changes_query_param_absolute_path(client, tmp_path):
+    """Test git changes with query parameter and absolute path (main fix use case).
+
+    Uses an existing absolute path (the Docker case, where the workspace mount
+    really exists) so it is forwarded verbatim — workspace re-rooting is a no-op
+    whenever the supplied path exists.
+    """
     expected_changes = [
         GitChange(status=GitChangeStatus.ADDED, path=Path("new_file.py")),
     ]
@@ -243,7 +248,7 @@ async def test_git_changes_query_param_absolute_path(client):
         mock_git_changes.return_value = expected_changes
 
         # This is the main use case - absolute paths with leading slash
-        test_path = "/workspace/project"
+        test_path = str(tmp_path)
         response = client.get("/api/git/changes", params={"path": test_path})
 
         assert response.status_code == 200
@@ -432,3 +437,89 @@ def test_git_legacy_routes_are_removed_from_openapi(client):
     openapi_paths = response.json()["paths"]
     assert "/api/git/changes/{path}" not in openapi_paths
     assert "/api/git/diff/{path}" not in openapi_paths
+
+
+# =============================================================================
+# Workspace path re-rooting (non-Docker / process sandbox) Tests
+# =============================================================================
+
+
+def test_resolve_workspace_path_no_op_when_path_exists(tmp_path):
+    """An existing path is returned unchanged (the Docker case)."""
+    from openhands.agent_server.git_router import _resolve_workspace_path
+
+    assert _resolve_workspace_path(str(tmp_path)) == str(tmp_path)
+
+
+def test_resolve_workspace_path_rerooted_under_cwd(tmp_path, monkeypatch):
+    """A GUI ``/workspace/project/<repo>`` path that doesn't exist is re-rooted
+    under the server's working directory (the process-sandbox layout)."""
+    from openhands.agent_server.git_router import _resolve_workspace_path
+
+    (tmp_path / "z8l-ai-hub").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    resolved = _resolve_workspace_path("/workspace/project/z8l-ai-hub")
+    assert resolved == str(tmp_path / "z8l-ai-hub")
+
+
+def test_resolve_workspace_path_strips_conversation_id_segment(tmp_path, monkeypatch):
+    """A sandbox-grouping conversation-id segment is stripped before re-rooting."""
+    from openhands.agent_server.git_router import _resolve_workspace_path
+
+    (tmp_path / "z8l-ai-hub").mkdir()
+    monkeypatch.chdir(tmp_path)
+
+    conv_id = "573f3898eda849fdb781f9c8eba3c693"  # 32-char hex
+    resolved = _resolve_workspace_path(f"/workspace/project/{conv_id}/z8l-ai-hub")
+    assert resolved == str(tmp_path / "z8l-ai-hub")
+
+
+def test_resolve_workspace_path_unresolvable_returns_original(tmp_path, monkeypatch):
+    """If nothing matches under cwd, the original path is returned untouched so
+    the caller's not-a-repo handling still runs."""
+    from openhands.agent_server.git_router import _resolve_workspace_path
+
+    monkeypatch.chdir(tmp_path)
+    assert (
+        _resolve_workspace_path("/workspace/project/does-not-exist")
+        == "/workspace/project/does-not-exist"
+    )
+
+
+@pytest.mark.asyncio
+async def test_git_changes_rerooted_for_process_sandbox_path(
+    client, tmp_path, monkeypatch
+):
+    """End-to-end: a real edited repo at ``<cwd>/<repo>`` is found even though
+    the GUI queries the hard-coded Docker path ``/workspace/project/<repo>``.
+
+    Reproduces the reported bug (Changes tab empty in local/process mode) and
+    confirms the re-rooting fix through the actual router + SDK.
+    """
+    repo = tmp_path / "z8l-ai-hub"
+    repo.mkdir()
+    for cfg in (
+        ["git", "init"],
+        ["git", "config", "user.email", "test@example.com"],
+        ["git", "config", "user.name", "Test"],
+    ):
+        subprocess.run(cfg, cwd=repo, check=True, capture_output=True)
+    tracked = repo / "_README.md"
+    tracked.write_text("# Title\n")
+    subprocess.run(["git", "add", "-A"], cwd=repo, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "init"], cwd=repo, check=True, capture_output=True
+    )
+    # The agent edits the file in the working tree.
+    tracked.write_text("# Title (Demo Edit)\n")
+
+    monkeypatch.chdir(tmp_path)
+
+    response = client.get(
+        "/api/git/changes",
+        params={"path": "/workspace/project/z8l-ai-hub", "ref": "HEAD"},
+    )
+
+    assert response.status_code == 200
+    assert response.json() == [{"status": "UPDATED", "path": "_README.md"}]
