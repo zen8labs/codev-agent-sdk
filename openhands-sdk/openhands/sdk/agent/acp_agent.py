@@ -1066,7 +1066,19 @@ class _OpenHandsACPBridge:
             self._maybe_signal_activity()
         elif isinstance(update, AgentThoughtChunk):
             if isinstance(update.content, TextContentBlock):
-                self.accumulated_thoughts.append(self._mask_value(update.content.text))
+                text = self._mask_value(update.content.text)
+                self.accumulated_thoughts.append(text)
+                # Relay the reasoning chunk live, mirroring the AgentMessageChunk
+                # path above. The agent-server's token-streaming callback routes
+                # an LLMStreamChunk's ``delta.reasoning_content`` into
+                # ``StreamingDeltaEvent.reasoning_content`` — the same channel the
+                # built-in Agent uses for reasoning models — so the UI shows the
+                # ACP server's thinking as it streams instead of dropping it (the
+                # subprocess emits many reasoning chunks per turn that previously
+                # only lived in ``accumulated_thoughts`` and never reached the UI).
+                if self.on_token is not None:
+                    self._emit_reasoning_token(text)
+            self._maybe_signal_activity()
         elif isinstance(update, UsageUpdate):
             # Store the update for step()/ask_agent() to process in one place.
             self._context_window = update.size
@@ -1154,6 +1166,36 @@ class _OpenHandsACPBridge:
             self._maybe_signal_activity()
         else:
             logger.debug("ACP session update: %s", type(update).__name__)
+
+    def _emit_reasoning_token(self, text: str) -> None:
+        """Relay an ACP thought chunk to ``on_token`` as a reasoning delta.
+
+        Wraps the (already-masked) thought text in a minimal
+        ``ModelResponseStream`` whose ``delta.reasoning_content`` carries it.
+        The agent-server's token callback (``_token_streaming_callback``)
+        already distinguishes a bare ``str`` (rendered as message content) from
+        an ``LLMStreamChunk`` (whose ``reasoning_content`` is rendered as the
+        thinking trace), so reusing that contract surfaces ACP reasoning through
+        the exact path the built-in Agent uses — no new event type or callback
+        channel. Best-effort: any construction/relay failure is swallowed (the
+        text is still persisted via ``accumulated_thoughts``).
+        """
+        if self.on_token is None:
+            return
+        try:
+            from litellm.types.utils import Delta, ModelResponseStream, StreamingChoices
+
+            chunk = ModelResponseStream(
+                choices=[
+                    StreamingChoices(
+                        index=0,
+                        delta=Delta(content=None, reasoning_content=text),
+                    )
+                ]
+            )
+            self.on_token(chunk)
+        except Exception:
+            logger.debug("on_token reasoning relay failed", exc_info=True)
 
     def _emit_tool_call_event(self, tc: dict[str, Any]) -> None:
         """Emit an ACPToolCallEvent reflecting the current state of ``tc``.
@@ -1368,6 +1410,18 @@ class ACPAgent(AgentBase):
             "Session mode ID to set after creating a session. "
             "If None (default), auto-detected from the ACP server type: "
             "'bypassPermissions' for claude-agent-acp, 'full-access' for codex-acp."
+        ),
+    )
+    acp_subagent_http_base: str | None = Field(
+        default=None,
+        description=(
+            "Base URL of OpenCode's REST/event HTTP server for this conversation "
+            "(e.g. 'http://127.0.0.1:53127'). Used to recover OpenCode subagent "
+            "(task-tool) tool calls, which never surface over the ACP protocol. "
+            "When None, falls back to the OPENCODE_HTTP_API_BASE env var / the "
+            "default 127.0.0.1:4096 — correct under Docker (network-isolated "
+            "sandbox) but ambiguous in local/process mode, where the deploying "
+            "app pins a unique port per conversation and sets this field."
         ),
     )
     acp_prompt_timeout: float = Field(
@@ -2905,17 +2959,32 @@ class ACPAgent(AgentBase):
     def _prompt_response_was_cancelled(response: PromptResponse | None) -> bool:
         return response is not None and response.stop_reason == "cancelled"
 
+    @property
+    def _http_api_base(self) -> str:
+        """Resolve OpenCode's REST/event base URL for subagent recovery.
+
+        Precedence: the per-conversation ``acp_subagent_http_base`` field (set
+        by the deploying app when it pins a unique port — required in
+        local/process mode where all conversations share the host network) →
+        the ``OPENCODE_HTTP_API_BASE`` env var → the module default
+        ``127.0.0.1:4096`` (correct under Docker's network-isolated sandbox).
+        """
+        return self.acp_subagent_http_base or _OPENCODE_HTTP_API_BASE
+
     def _subagents_pollable(self) -> bool:
         """Whether this turn should poll OpenCode's HTTP API for subagents.
 
         Only OpenCode's ``task`` tool spawns subagent sessions, and its REST
         API port is only bound inside OpenCode sandboxes — polling other ACP
-        providers just yields spurious connection errors.  The env override
-        exists for tests / non-standard deployments.
+        providers just yields spurious connection errors.  The env / field
+        override exists for tests, non-standard deployments, and local/process
+        mode (per-conversation pinned port).
         """
         agent_name_lower = (self._agent_name or "").lower()
-        return "opencode" in agent_name_lower or bool(
-            os.environ.get("OPENCODE_HTTP_API_BASE")
+        return (
+            "opencode" in agent_name_lower
+            or bool(self.acp_subagent_http_base)
+            or bool(os.environ.get("OPENCODE_HTTP_API_BASE"))
         )
 
     def _fetch_subagent_tool_call_events(self) -> list[ACPToolCallEvent]:
@@ -2939,7 +3008,7 @@ class ACPAgent(AgentBase):
         session_id = self._session_id
         if not session_id or not self._subagents_pollable():
             return events
-        base = _OPENCODE_HTTP_API_BASE
+        base = self._http_api_base
         try:
             # Step 1: get child (subagent) sessions
             with urllib.request.urlopen(
