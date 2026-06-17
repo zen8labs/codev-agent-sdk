@@ -336,6 +336,27 @@ _CODEX_MODELS: tuple[ACPModelOption, ...] = (
     ACPModelOption(id="gpt-5.2/xhigh", label="GPT-5.2 (xhigh)"),
 )
 
+# Free models exposed by the OpenCode Zen gateway (https://opencode.ai/zen),
+# OpenCode's own OpenAI-compatible model hub. These are the no-cost tiers a user
+# gets with an OpenCode Zen API key (obtained via ``opencode auth login``); the
+# deploying application routes them by building an ``OPENCODE_CONFIG_CONTENT``
+# that declares the gateway as an OpenAI-compatible provider.
+#
+# This list is only a STATIC FALLBACK. The free roster is time-limited and
+# rotates often, so the authoritative source is the gateway's own discovery
+# endpoint (``GET https://opencode.ai/zen/v1/models``, ``free == true``); the
+# deploying application should fetch it live and fall back to this list only
+# when the fetch fails. The ids below were captured from that endpoint and will
+# drift — a user can always type any model their Zen account exposes.
+_OPENCODE_MODELS: tuple[ACPModelOption, ...] = (
+    ACPModelOption(id="minimax-m3-free", label="MiniMax M3 (free)"),
+    ACPModelOption(id="deepseek-v4-flash-free", label="DeepSeek V4 Flash (free)"),
+    ACPModelOption(id="qwen3.6-plus-free", label="Qwen3.6 Plus (free)"),
+    ACPModelOption(id="mimo-v2.5-free", label="MiMo V2.5 (free)"),
+    ACPModelOption(id="nemotron-3-ultra-free", label="Nemotron 3 Ultra (free)"),
+    ACPModelOption(id="north-mini-code-free", label="North Mini Code (free)"),
+)
+
 # Model IDs accepted by ``@google/gemini-cli --acp``. The ``auto-gemini-*``
 # entries delegate version selection to the CLI's router; the explicit
 # ``gemini-3.1-*`` / ``gemini-2.5-*`` entries pin to a specific snapshot.
@@ -501,11 +522,15 @@ ACP_PROVIDERS: Mapping[str, ACPProviderInfo] = MappingProxyType(
             supports_set_session_model=False,
             supports_runtime_model_switch=False,
             session_meta_key=None,
-            # No curated list: effective models come from the user's own
-            # provider config (OPENCODE_CONFIG_CONTENT); the deploying
-            # application maps ``acp_model`` into the config's ``model`` field.
-            available_models=(),
-            default_model=None,
+            # Curated free OpenCode Zen models for the picker. A user with a
+            # custom LLM profile still overrides these (their LiteLLM model is
+            # routed inline via OPENCODE_CONFIG_CONTENT); without one, these Zen
+            # models are routed through the OpenCode Zen gateway using the user's
+            # pasted Zen API key (reserved ``OPENCODE_API_KEY`` secret). The
+            # deploying application maps the selected ``acp_model`` into the
+            # config's ``model`` field either way.
+            available_models=_OPENCODE_MODELS,
+            default_model="minimax-m3-free",
             binary_name="opencode",
             # Relocates ~/.local/share/opencode (auth.json, opencode.db) for
             # per-conversation isolation under sandbox grouping.

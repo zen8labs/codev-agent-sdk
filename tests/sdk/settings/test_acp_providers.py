@@ -222,15 +222,19 @@ class TestProviderModelLists:
     """Verify the curated ``available_models`` / ``default_model`` fields."""
 
     def test_every_builtin_provider_has_available_models(self):
-        # opencode deliberately has no curated list: its effective models come
-        # from the user's own provider config (OPENCODE_CONFIG_CONTENT), and
-        # protocol-level model selection is unsupported (only the non-standard
-        # unstable_setSessionModel exists).
+        # All built-in providers now expose a curated picker. opencode's list is
+        # the free OpenCode Zen models; a user with a custom LLM profile still
+        # overrides it (routed inline via OPENCODE_CONFIG_CONTENT).
         for key, info in ACP_PROVIDERS.items():
-            if key == "opencode":
-                assert not info.available_models
-                continue
             assert info.available_models, f"{key}: available_models must not be empty"
+
+    def test_opencode_exposes_free_zen_models(self):
+        # Static fallback only; the live roster is fetched from the Zen
+        # /models endpoint by the deploying application. Just assert the
+        # fallback is self-consistent (default is one of the listed ids).
+        info = ACP_PROVIDERS["opencode"]
+        assert info.default_model == "minimax-m3-free"
+        assert all(m.id.endswith("-free") for m in info.available_models)
 
     def test_available_models_entries_are_model_options(self):
         for info in ACP_PROVIDERS.values():
