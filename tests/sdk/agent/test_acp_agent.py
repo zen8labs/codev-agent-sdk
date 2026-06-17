@@ -7332,6 +7332,61 @@ class TestACPFileSecretMaterialisation:
         # The blob is not exported as an env var.
         assert "CODEX_AUTH_JSON" not in env
 
+    def test_codex_chatgpt_subscription_strips_proxy_openai_env(self, tmp_path):
+        """Codex ChatGPT-subscription auth must not be overridden by the generic
+        LLM's OPENAI_API_KEY / OPENAI_BASE_URL (folded into the subprocess env by
+        ACPAgentSettings.create_agent -> resolve_provider_env). codex translates
+        OPENAI_BASE_URL into `-c openai_base_url=...` and would route the
+        subscription token to that proxy (e.g. a LiteLLM gateway), which rejects
+        it with 403 -> ACPPromptError: Internal error. They must be stripped when
+        a chatgpt auth.json is active."""
+        from openhands.sdk.secret import StaticSecret
+
+        agent = ACPAgent(acp_command=["codex-acp"])
+        state = self._state(tmp_path)
+        state.secret_registry.update_secrets(
+            {
+                "CODEX_AUTH_JSON": StaticSecret(
+                    value=SecretStr(
+                        '{"auth_mode": "chatgpt", "tokens": {"access_token": "x"}}'
+                    )
+                ),
+                "OPENAI_API_KEY": StaticSecret(value=SecretStr("sk-proxy")),
+                "OPENAI_BASE_URL": StaticSecret(
+                    value=SecretStr("https://proxy.example.com/gateway")
+                ),
+            }
+        )
+        env = self._run_start(agent, state, conn=self._make_conn())
+
+        assert "CODEX_HOME" in env  # subscription auth.json materialised
+        assert "OPENAI_API_KEY" not in env
+        assert "OPENAI_BASE_URL" not in env
+
+    def test_codex_api_key_auth_keeps_openai_env(self, tmp_path):
+        """When the codex auth.json is an API-key file (not a ChatGPT
+        subscription), the proxy OPENAI_* env must be preserved — that is how an
+        API-key user routes codex through their gateway."""
+        from openhands.sdk.secret import StaticSecret
+
+        agent = ACPAgent(acp_command=["codex-acp"])
+        state = self._state(tmp_path)
+        state.secret_registry.update_secrets(
+            {
+                "CODEX_AUTH_JSON": StaticSecret(
+                    value=SecretStr('{"OPENAI_API_KEY": "sk-file"}')
+                ),
+                "OPENAI_API_KEY": StaticSecret(value=SecretStr("sk-proxy")),
+                "OPENAI_BASE_URL": StaticSecret(
+                    value=SecretStr("https://proxy.example.com/gateway")
+                ),
+            }
+        )
+        env = self._run_start(agent, state, conn=self._make_conn())
+
+        assert env.get("OPENAI_API_KEY") == "sk-proxy"
+        assert env.get("OPENAI_BASE_URL") == "https://proxy.example.com/gateway"
+
     def test_gemini_vertex_sa_materialises_and_points_at_file(self, tmp_path):
         from openhands.sdk.secret import StaticSecret
 

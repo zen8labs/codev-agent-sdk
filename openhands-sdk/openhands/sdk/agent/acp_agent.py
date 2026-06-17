@@ -292,6 +292,34 @@ def _codex_auth_file(env: dict[str, str]) -> Path:
     return Path.home() / _CHATGPT_AUTH_PATH
 
 
+def _codex_uses_chatgpt_subscription(env: dict[str, str]) -> bool:
+    """Whether Codex will authenticate via its ChatGPT-subscription ``auth.json``.
+
+    Mirrors :func:`_select_auth_method`'s ``chatgpt`` branch: the materialised /
+    relocated ``auth.json`` exists and carries OAuth tokens (``auth_mode`` of
+    ``chatgpt``, or a ``tokens.access_token``) rather than a bare API key.
+
+    When this holds, the generic LLM credentials folded into the subprocess env
+    by :meth:`ACPAgentSettings.create_agent` (``OPENAI_API_KEY`` /
+    ``OPENAI_BASE_URL`` from ``resolve_provider_env``) must be stripped: codex
+    translates ``OPENAI_BASE_URL`` into its ``-c openai_base_url=...`` config and
+    would route the subscription token to that proxy (e.g. a LiteLLM gateway),
+    which rejects it with 403 → ``ACPPromptError: Internal error``. Mirrors the
+    ``CLAUDE_CODE_OAUTH_TOKEN`` strip in :data:`_ENV_CONFLICT_MAP`, but keyed on
+    the file-backed credential rather than an env var.
+    """
+    try:
+        data = json.loads(_codex_auth_file(env).read_text())
+    except (OSError, ValueError):
+        return False
+    if not isinstance(data, dict):
+        return False
+    if data.get("auth_mode") == "chatgpt":
+        return True
+    tokens = data.get("tokens")
+    return isinstance(tokens, dict) and bool(tokens.get("access_token"))
+
+
 def _select_auth_method(
     auth_methods: list[Any],
     env: dict[str, str],
@@ -2205,6 +2233,21 @@ class ACPAgent(AgentBase):
             if dominant in env:
                 for conflict in conflicts:
                     env.pop(conflict, None)
+
+        # Codex ChatGPT subscription: the generic LLM credentials folded into the
+        # env by ACPAgentSettings.create_agent (OPENAI_API_KEY / OPENAI_BASE_URL)
+        # would otherwise route the subscription token to that proxy via codex's
+        # `-c openai_base_url=...` (the _codex_base_url_overrides translation
+        # below) and be rejected. Strip them so codex talks to the ChatGPT
+        # backend. File-backed analogue of the _ENV_CONFLICT_MAP strip above.
+        _provider = detect_acp_provider_by_command(self.acp_command)
+        if (
+            _provider is not None
+            and _provider.key == "codex"
+            and _codex_uses_chatgpt_subscription(env)
+        ):
+            env.pop("OPENAI_API_KEY", None)
+            env.pop("OPENAI_BASE_URL", None)
 
         command = self.acp_command[0]
         args = list(self.acp_command[1:]) + list(self.acp_args)
