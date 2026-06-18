@@ -259,9 +259,7 @@ jobs:
                   git add -A
                   git commit -m "Implement TODO: $TODO_DESCRIPTION
 
-                  Automatically implemented by OpenHands agent.
-
-                  Co-authored-by: openhands <openhands@all-hands.dev>"
+                  Automatically implemented by OpenHands agent."
 
                   # Push branch
                   git push origin "$BRANCH_NAME"

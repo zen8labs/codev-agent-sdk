@@ -68,7 +68,7 @@ jobs:
                   if git diff --staged --quiet; then
                     echo "No changes to commit"
                   else
-                    git commit -m "Release v$INPUTS_VERSION" -m "Co-authored-by: openhands <openhands@all-hands.dev>"
+                    git commit -m "Release v$INPUTS_VERSION"
                     echo "✅ Changes committed"
                   fi
 

@@ -142,9 +142,7 @@ cd /workspace/project/openhands-docs
 git checkout -b <feature-name>
 # Edit files in sdk/ folder
 git add sdk/
-git commit -m "Document <feature>
-
-Co-authored-by: openhands <openhands@all-hands.dev>"
+git commit -m "Document <feature>"
 git push -u origin <feature-name>
 ```
 

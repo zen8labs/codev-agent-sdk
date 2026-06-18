@@ -102,8 +102,6 @@ Update documentation to reflect current codebase
 - [Tools added/removed/updated]
 - [Diagrams simplified/corrected]
 - [Examples verified/fixed]
-
-Co-authored-by: openhands <openhands@all-hands.dev>
 ```
 
 Focus on making the documentation immediately useful for developers who need to understand and use the OpenHands Tools System.

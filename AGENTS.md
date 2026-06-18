@@ -192,7 +192,6 @@ consult each relevant package-level AGENTS.md.
   - linting and formatter with `uv ruff`
 - NEVER USE `mypy`!
 - Do NOT commit ALL the file, just commit the relevant file you've changed!
-- In every commit message, you should add "Co-authored-by: openhands <openhands@all-hands.dev>"
 - You can run pytest with `uv run pytest`
 
 # Instruction for fixing "E501 Line too long"

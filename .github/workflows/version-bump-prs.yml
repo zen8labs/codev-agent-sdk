@@ -145,8 +145,7 @@ jobs:
                   # Commit and push
                   git add pyproject.toml uv.lock
                   git commit -m "Bump openhands-sdk, openhands-tools to $VERSION" \
-                    -m "Automated version bump after PyPI release." \
-                    -m "Co-authored-by: openhands <openhands@all-hands.dev>"
+                    -m "Automated version bump after PyPI release."
                   git push -u origin "$BRANCH"
 
                   # Check if PR already exists
@@ -337,9 +336,7 @@ jobs:
                     -m "- Regenerated enterprise/poetry.lock to keep transitive SDK pins aligned" \
                     -m "- Regenerated uv.lock" \
                     -m "- Updated AGENT_SERVER_IMAGE to ${VERSION}" \
-                    -m "- Updated mypy additional_dependencies pins in pre-commit config" \
-                    -m "" \
-                    -m "Co-authored-by: openhands <openhands@all-hands.dev>"
+                    -m "- Updated mypy additional_dependencies pins in pre-commit config"
                   git push -u origin "$BRANCH"
 
                   # Check if PR already exists
