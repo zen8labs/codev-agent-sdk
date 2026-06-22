@@ -80,7 +80,7 @@ PROMPT = """
 Please complete the following task to demonstrate browser session recording:
 
 1. Use `browser_start_recording` to begin recording.
-2. Navigate to https://docs.openhands.dev/ and:
+2. Navigate to https://docs.z8l-agent.dev/ and:
     - Get the page content
     - Scroll down the page
     - Get the browser state to see interactive elements

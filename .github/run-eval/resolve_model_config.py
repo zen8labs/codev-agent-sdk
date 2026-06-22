@@ -591,7 +591,7 @@ def run_preflight_check(models: list[dict[str, Any]]) -> bool:
         True if all models passed, False otherwise
     """
     api_key = os.environ.get("LLM_API_KEY")
-    base_url = os.environ.get("LLM_BASE_URL", "https://llm-proxy.eval.all-hands.dev")
+    base_url = os.environ.get("LLM_BASE_URL", "https://llm-proxy.eval.z8l-agent.dev")
     skip_preflight = os.environ.get("SKIP_PREFLIGHT", "").lower() == "true"
 
     if skip_preflight:

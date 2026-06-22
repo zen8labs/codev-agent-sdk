@@ -27,10 +27,10 @@ def _make_test_client(app: FastAPI) -> AsyncClient:
 
 class TestHostAllowlist:
     def test_allows_canonical_cloud_host(self):
-        assert _is_host_allowed("https://app.all-hands.dev")
+        assert _is_host_allowed("https://app.z8l-agent.dev")
 
     def test_allows_subdomain_of_allowed_root(self):
-        assert _is_host_allowed("https://eu.all-hands.dev")
+        assert _is_host_allowed("https://eu.z8l-agent.dev")
 
     def test_rejects_loopback(self):
         assert not _is_host_allowed("http://localhost:8000")
@@ -61,14 +61,14 @@ class TestHostAllowlist:
 
     def test_rejects_non_http_scheme(self):
         assert not _is_host_allowed("file:///etc/passwd")
-        assert not _is_host_allowed("ftp://app.all-hands.dev")
+        assert not _is_host_allowed("ftp://app.z8l-agent.dev")
 
     def test_env_var_overrides_default_allowlist(self, monkeypatch):
         monkeypatch.setenv("OH_CLOUD_PROXY_ALLOWED_HOSTS", "example.com")
         assert _is_host_allowed("https://example.com")
         assert _is_host_allowed("https://api.example.com")
-        # Default allowlist is fully replaced — all-hands.dev no longer matches.
-        assert not _is_host_allowed("https://app.all-hands.dev")
+        # Default allowlist is fully replaced, z8l-agent.dev no longer matches.
+        assert not _is_host_allowed("https://app.z8l-agent.dev")
 
 
 @pytest.mark.asyncio
@@ -106,7 +106,7 @@ async def test_proxy_forwards_get_and_returns_upstream_json(monkeypatch):
         response = await client.post(
             "/api/cloud-proxy",
             json={
-                "host": "https://app.all-hands.dev",
+                "host": "https://app.z8l-agent.dev",
                 "method": "GET",
                 "path": "/api/organizations",
                 "headers": {"Authorization": "Bearer test-token"},
@@ -116,7 +116,7 @@ async def test_proxy_forwards_get_and_returns_upstream_json(monkeypatch):
     assert response.status_code == 200
     assert response.json() == upstream_payload
     assert captured["method"] == "GET"
-    assert captured["url"] == "https://app.all-hands.dev/api/organizations"
+    assert captured["url"] == "https://app.z8l-agent.dev/api/organizations"
     assert captured["headers"] == {"Authorization": "Bearer test-token"}
 
 
@@ -141,7 +141,7 @@ async def test_proxy_propagates_upstream_error_status(monkeypatch):
         response = await client.post(
             "/api/cloud-proxy",
             json={
-                "host": "https://app.all-hands.dev",
+                "host": "https://app.z8l-agent.dev",
                 "method": "GET",
                 "path": "/api/organizations",
                 "headers": {"Authorization": "Bearer bad"},
@@ -185,7 +185,7 @@ async def test_proxy_returns_502_on_upstream_network_error(monkeypatch):
         response = await client.post(
             "/api/cloud-proxy",
             json={
-                "host": "https://app.all-hands.dev",
+                "host": "https://app.z8l-agent.dev",
                 "method": "GET",
                 "path": "/api/organizations",
             },
@@ -218,7 +218,7 @@ async def test_proxy_strips_upstream_set_cookie_and_cors_headers(monkeypatch):
         response = await client.post(
             "/api/cloud-proxy",
             json={
-                "host": "https://app.all-hands.dev",
+                "host": "https://app.z8l-agent.dev",
                 "method": "GET",
                 "path": "/api/organizations",
             },

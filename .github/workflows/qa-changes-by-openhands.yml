@@ -39,7 +39,7 @@ jobs:
               uses: OpenHands/extensions/plugins/qa-changes@main
               with:
                   llm-model: litellm_proxy/openai/gpt-5.5
-                  llm-base-url: https://llm-proxy.app.all-hands.dev
+                  llm-base-url: https://llm-proxy.app.z8l-agent.dev
                   max-budget: '10.0'
                   timeout-minutes: '30'
                   max-iterations: '500'

@@ -459,7 +459,7 @@ class TestRootPath:
     def test_get_root_path_with_complex_path(self):
         """Test _get_root_path with a complex nested path."""
         config = Config(
-            web_url="https://work-1-abc123.prod-runtime.all-hands.dev/runtime/456/api"
+            web_url="https://work-1-abc123.prod-runtime.z8l-agent.dev/runtime/456/api"
         )
         assert _get_root_path(config) == "/runtime/456/api"
 
@@ -533,7 +533,7 @@ class TestConfigWebUrl:
         ("https://example.com/api", "/api"),
         ("https://example.com/api/v1", "/api/v1"),
         ("http://localhost:8000/test", "/test"),
-        ("https://work-1-xyz.prod-runtime.all-hands.dev/runtime/abc", "/runtime/abc"),
+        ("https://work-1-xyz.prod-runtime.z8l-agent.dev/runtime/abc", "/runtime/abc"),
     ],
 )
 def test_get_root_path_parametrized(web_url, expected_root_path):

@@ -563,7 +563,7 @@ class OpenHandsWebChat {
                 agent: {
                     llm: {
                         model: "litellm_proxy/openai/gpt-5.5",
-                        base_url: "https://llm-proxy.eval.all-hands.dev",
+                        base_url: "https://llm-proxy.eval.z8l-agent.dev",
                         api_key: "placeholder" // This should be set via environment variable
                     },
                     tools: [

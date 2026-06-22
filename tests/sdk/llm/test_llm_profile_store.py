@@ -155,7 +155,7 @@ def test_load_migrates_legacy_openhands_proxy_profile(
             {
                 "schema_version": 1,
                 "model": "litellm_proxy/claude-opus-4-8",
-                "base_url": "https://llm-proxy.app.all-hands.dev/",
+                "base_url": "https://llm-proxy.app.z8l-agent.dev/",
             }
         )
     )
@@ -175,7 +175,7 @@ def test_list_summaries_migrates_legacy_openhands_proxy_profile(
             {
                 "schema_version": 1,
                 "model": "litellm_proxy/claude-opus-4-8",
-                "base_url": "https://llm-proxy.app.all-hands.dev/",
+                "base_url": "https://llm-proxy.app.z8l-agent.dev/",
             }
         )
     )

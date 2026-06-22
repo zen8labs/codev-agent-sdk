@@ -7,7 +7,7 @@ dev) and this server makes the upstream call server-side, where CORS does
 not apply.
 
 Hosts are allowlisted to prevent the proxy from being abused as an SSRF
-relay. By default only `*.all-hands.dev` is permitted; the operator can
+relay. By default only `*.z8l-agent.dev` is permitted; the operator can
 override via the ``OH_CLOUD_PROXY_ALLOWED_HOSTS`` environment variable
 (comma-separated list of hostnames or suffixes).
 """
@@ -31,7 +31,7 @@ logger = get_logger(__name__)
 
 cloud_proxy_router = APIRouter(prefix="/cloud-proxy", tags=["Cloud Proxy"])
 
-_DEFAULT_ALLOWED_HOSTS = ("all-hands.dev",)
+_DEFAULT_ALLOWED_HOSTS = ("z8l-agent.dev",)
 _DENYLISTED_HOSTNAMES = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
 
 
@@ -40,7 +40,7 @@ class CloudProxyRequest(BaseModel):
 
     host: str = Field(
         description=(
-            "Cloud host base URL, e.g. 'https://app.all-hands.dev'. Must "
+            "Cloud host base URL, e.g. 'https://app.z8l-agent.dev'. Must "
             "match the configured allowlist."
         )
     )

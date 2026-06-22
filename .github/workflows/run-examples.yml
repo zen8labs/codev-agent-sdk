@@ -70,7 +70,7 @@ jobs:
               env:
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
                   LLM_MODEL: openhands/claude-haiku-4-5-20251001
-                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_BASE_URL: https://llm-proxy.app.z8l-agent.dev
                   RUNTIME_API_KEY: ${{ secrets.RUNTIME_API_KEY }}
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
                   PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -79,9 +79,9 @@ jobs:
                   SDK_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
                   OPENHANDS_CLOUD_API_KEY: ${{ secrets.ALLHANDS_BOT_OPENHANDS_SAAS_API_KEY }}
                   # ACP agents (Claude Code, Codex) route through LiteLLM proxy
-                  ANTHROPIC_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  ANTHROPIC_BASE_URL: https://llm-proxy.app.z8l-agent.dev
                   ANTHROPIC_API_KEY: ${{ secrets.LLM_API_KEY }}
-                  OPENAI_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  OPENAI_BASE_URL: https://llm-proxy.app.z8l-agent.dev
                   OPENAI_API_KEY: ${{ secrets.LLM_API_KEY }}
               run: |
                   RESULTS_DIR=".example-test-results"

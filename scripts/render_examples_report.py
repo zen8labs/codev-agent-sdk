@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 
-from openhands.sdk.utils.github import sanitize_openhands_mentions
+from openhands.sdk.utils.github import sanitize_agent_mentions
 
 
 @dataclass(slots=True)
@@ -234,7 +234,7 @@ def main() -> int:
     args = parse_args()
     results = load_results(args.results_dir)
     report = build_report(args, results)
-    sanitized = sanitize_openhands_mentions(report)
+    sanitized = sanitize_agent_mentions(report)
 
     if args.output is not None:
         args.output.write_text(sanitized)

@@ -376,7 +376,7 @@ jobs:
               env:
                   MODEL_IDS: ${{ steps.params.outputs.models }}
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY_EVAL }}
-                  LLM_BASE_URL: https://llm-proxy.eval.all-hands.dev
+                  LLM_BASE_URL: https://llm-proxy.eval.z8l-agent.dev
               run: |
                   uv run python .github/run-eval/resolve_model_config.py
 

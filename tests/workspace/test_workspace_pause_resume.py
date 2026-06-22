@@ -56,7 +56,7 @@ def mock_cloud_workspace():
 
     with patch.object(OpenHandsCloudWorkspace, "_start_sandbox"):
         workspace = OpenHandsCloudWorkspace(
-            cloud_api_url="https://app.all-hands.dev",
+            cloud_api_url="https://app.z8l-agent.dev",
             cloud_api_key="test-key",
         )
 
@@ -245,7 +245,7 @@ def test_cloud_workspace_resume_raises_if_no_sandbox():
 
     with patch.object(OpenHandsCloudWorkspace, "_start_sandbox"):
         workspace = OpenHandsCloudWorkspace(
-            cloud_api_url="https://app.all-hands.dev",
+            cloud_api_url="https://app.z8l-agent.dev",
             cloud_api_key="test-key",
         )
 

@@ -1,7 +1,7 @@
 """Example: OpenHandsCloudWorkspace for OpenHands Cloud API.
 
 This example demonstrates using OpenHandsCloudWorkspace to provision a sandbox
-via OpenHands Cloud (app.all-hands.dev) and run an agent conversation.
+via z8l-agent Cloud (app.z8l-agent.dev) and run an agent conversation.
 
 Usage:
   uv run examples/02_remote_agent_server/06_convo_with_cloud_workspace.py
@@ -52,7 +52,7 @@ if not cloud_api_key:
     logger.error("OPENHANDS_CLOUD_API_KEY required")
     exit(1)
 
-cloud_api_url = os.getenv("OPENHANDS_CLOUD_API_URL", "https://app.all-hands.dev")
+cloud_api_url = os.getenv("OPENHANDS_CLOUD_API_URL", "https://app.z8l-agent.dev")
 logger.info(f"Using OpenHands Cloud API: {cloud_api_url}")
 
 with OpenHandsCloudWorkspace(

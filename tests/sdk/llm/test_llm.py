@@ -58,7 +58,7 @@ def test_base_url_for_openhands_provider(mock_get):
     assert llm.model == "openhands/claude-sonnet-4-20250514"
     assert llm.base_url is None
     mock_get.assert_called_once_with(
-        "https://llm-proxy.app.all-hands.dev/v1/model/info",
+        "https://llm-proxy.app.z8l-agent.dev/v1/model/info",
         headers={"Authorization": "Bearer test-key"},
     )
 
@@ -99,7 +99,7 @@ def test_openhands_provider_translates_only_for_litellm(mock_completion, mock_ge
     assert llm.base_url is None
     _, kwargs = mock_completion.call_args
     assert kwargs["model"] == "litellm_proxy/claude-haiku-4-5-20251001"
-    assert kwargs["api_base"] == "https://llm-proxy.app.all-hands.dev"
+    assert kwargs["api_base"] == "https://llm-proxy.app.z8l-agent.dev"
     persisted = llm.to_persisted()
     assert persisted["model"] == "openhands/claude-haiku-4-5-20251001"
     assert "base_url" not in persisted
@@ -1297,7 +1297,7 @@ def test_llm_raises_error_on_small_context_window(mock_get_model_info):
 
     assert exc_info.value.context_window == 2048
     assert exc_info.value.min_required == MIN_CONTEXT_WINDOW_TOKENS
-    assert "docs.openhands.dev" in str(exc_info.value)
+    assert "docs.z8l-agent.dev" in str(exc_info.value)
 
 
 @patch("openhands.sdk.llm.llm.get_litellm_model_info")

@@ -19,7 +19,7 @@ Requirements:
   - OPENHANDS_CLOUD_API_KEY: API key for OpenHands Cloud (the only credential needed)
 
 Optional:
-  - OPENHANDS_CLOUD_API_URL: Override the Cloud API URL (default: https://app.all-hands.dev)
+  - OPENHANDS_CLOUD_API_URL: Override the Cloud API URL (default: https://app.z8l-agent.dev)
   - LLM_MODEL: Override the model from your SaaS settings
 """
 
@@ -43,7 +43,7 @@ if not cloud_api_key:
     logger.error("OPENHANDS_CLOUD_API_KEY required")
     exit(1)
 
-cloud_api_url = os.getenv("OPENHANDS_CLOUD_API_URL", "https://app.all-hands.dev")
+cloud_api_url = os.getenv("OPENHANDS_CLOUD_API_URL", "https://app.z8l-agent.dev")
 logger.info(f"Using OpenHands Cloud API: {cloud_api_url}")
 
 with OpenHandsCloudWorkspace(

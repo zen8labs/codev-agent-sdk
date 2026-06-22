@@ -145,7 +145,7 @@ jobs:
                 6) If neither path yields a qualified maintainer, do not request review from anyone and do not fall back to a broader collaborator pool.
 
             LLM_MODEL: litellm_proxy/openai/gpt-5.5
-            LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+            LLM_BASE_URL: https://llm-proxy.app.z8l-agent.dev
         steps:
             - name: Checkout repository
               uses: actions/checkout@v6

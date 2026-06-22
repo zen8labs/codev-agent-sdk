@@ -84,7 +84,7 @@ jobs:
               id: compliance
               env:
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY_EVAL }}
-                  LLM_BASE_URL: https://llm-proxy.eval.all-hands.dev
+                  LLM_BASE_URL: https://llm-proxy.eval.z8l-agent.dev
                   GITHUB_RUN_ID: ${{ github.run_id }}
                   PATTERNS: ${{ steps.params.outputs.patterns }}
                   MODELS: ${{ steps.params.outputs.models }}

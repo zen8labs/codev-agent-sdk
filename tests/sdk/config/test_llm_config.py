@@ -141,8 +141,8 @@ def test_llm_config_aws_credentials():
 def test_llm_config_openrouter_defaults():
     """Test OpenRouter default values."""
     config = LLM(model="gpt-4o-mini", usage_id="test-llm")
-    assert config.openrouter_site_url == "https://docs.all-hands.dev/"
-    assert config.openrouter_app_name == "OpenHands"
+    assert config.openrouter_site_url == "https://docs.z8l-agent.dev/"
+    assert config.openrouter_app_name == "z8l-agent"
 
 
 def test_llm_config_post_init_openrouter_does_not_set_env():

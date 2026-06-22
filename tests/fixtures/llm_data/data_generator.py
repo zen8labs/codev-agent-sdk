@@ -221,7 +221,7 @@ def validate_generated_data(output_dir: Path) -> bool:
 
 def generate_all_test_data(
     api_key: str,
-    base_url: str = "https://llm-proxy.eval.all-hands.dev",
+    base_url: str = "https://llm-proxy.eval.z8l-agent.dev",
     output_dir: Path | None = None,
     fncall_model: str = "litellm_proxy/anthropic/claude-sonnet-4-20250514",
     nonfncall_model: str = "litellm_proxy/deepseek/deepseek-chat",
@@ -274,7 +274,7 @@ def main():
     )
     parser.add_argument(
         "--base-url",
-        default="https://llm-proxy.eval.all-hands.dev",
+        default="https://llm-proxy.eval.z8l-agent.dev",
         help="Base URL for LLM service",
     )
     parser.add_argument("--output-dir", help="Output directory for test data")

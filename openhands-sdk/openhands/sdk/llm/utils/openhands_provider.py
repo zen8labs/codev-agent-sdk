@@ -8,7 +8,7 @@ from openhands.sdk.llm.utils.verified_models import VERIFIED_MODELS
 
 OPENHANDS_PROVIDER_PREFIX: Final[str] = "openhands/"
 LITELLM_PROXY_PREFIX: Final[str] = "litellm_proxy/"
-OPENHANDS_LLM_PROXY_BASE_URL: Final[str] = "https://llm-proxy.app.all-hands.dev"
+OPENHANDS_LLM_PROXY_BASE_URL: Final[str] = "https://llm-proxy.app.z8l-agent.dev"
 
 
 class LiteLLMCallKwargs(TypedDict):
@@ -18,8 +18,8 @@ class LiteLLMCallKwargs(TypedDict):
 
 _OPENHANDS_PROXY_BASE_URLS: Final[frozenset[str]] = frozenset(
     {
-        "https://llm-proxy.app.all-hands.dev",
-        "https://llm-proxy.app.all-hands.dev/v1",
+        "https://llm-proxy.app.z8l-agent.dev",
+        "https://llm-proxy.app.z8l-agent.dev/v1",
     }
 )
 

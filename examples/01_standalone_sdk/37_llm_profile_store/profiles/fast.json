@@ -1,7 +1,7 @@
 {
   "model": "gpt-5.5",
   "api_key": "**********",
-  "openrouter_site_url": "https://docs.all-hands.dev/",
+  "openrouter_site_url": "https://docs.z8l-agent.dev/",
   "openrouter_app_name": "OpenHands",
   "num_retries": 5,
   "retry_multiplier": 8.0,

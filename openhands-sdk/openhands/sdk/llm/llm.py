@@ -258,10 +258,10 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
     )
 
     openrouter_site_url: str = Field(
-        default="https://docs.all-hands.dev/",
+        default="https://docs.z8l-agent.dev/",
     )
     openrouter_app_name: str = Field(
-        default="OpenHands",
+        default="z8l-agent",
     )
 
     num_retries: int = Field(default=5, ge=0)
@@ -320,7 +320,7 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
         default=None,
         description=(
             "Optional canonical model name for feature registry lookups. "
-            "The OpenHands SDK maintains a model feature registry that "
+            "The z8l-agent SDK maintains a model feature registry that "
             "maps model names to capabilities (e.g., vision support, "
             "prompt caching, responses API support). When using proxied or "
             "aliased model identifiers, set this field to the canonical "
@@ -1992,7 +1992,7 @@ class LLM(BaseModel, RetryMixin, NonNativeToolCallingMixin):
         self._effective_max_output_tokens = effective_max_output_tokens
 
     def _validate_context_window_size(self) -> None:
-        """Validate that the context window is large enough for OpenHands."""
+        """Validate that the context window is large enough for z8l-agent."""
         # Allow override via environment variable
         if os.environ.get(ENV_ALLOW_SHORT_CONTEXT_WINDOWS, "").lower() in (
             "true",

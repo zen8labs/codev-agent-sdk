@@ -18,7 +18,7 @@ Supported plugin sources:
 - With ref: branch, tag, or commit SHA
 - With repo_path: subdirectory for monorepos
 
-For full documentation, see: https://docs.all-hands.dev/sdk/guides/plugins
+For full documentation, see: https://docs.z8l-agent.dev/sdk/guides/plugins
 """
 
 import json

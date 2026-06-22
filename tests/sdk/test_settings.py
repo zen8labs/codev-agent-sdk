@@ -484,7 +484,7 @@ def test_validate_agent_settings_migrates_legacy_openhands_proxy_llm() -> None:
             "agent_kind": "openhands",
             "llm": {
                 "model": "litellm_proxy/claude-opus-4-8",
-                "base_url": "https://llm-proxy.app.all-hands.dev/",
+                "base_url": "https://llm-proxy.app.z8l-agent.dev/",
             },
         }
     )

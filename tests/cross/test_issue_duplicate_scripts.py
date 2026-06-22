@@ -1532,7 +1532,7 @@ def test_extract_agent_server_url_returns_runtime_prefix():
     )
     assert (
         module.extract_agent_server_url(
-            "https://app.all-hands.dev/conversations/conv-123"
+            "https://app.z8l-agent.dev/conversations/conv-123"
         )
         is None
     )
@@ -1818,7 +1818,7 @@ def test_issue_duplicate_main_waits_for_start_task_and_writes_output(
         module,
         "poll_conversation",
         lambda app_conversation_id, poll_interval_seconds, max_wait_seconds: {
-            "conversation_url": "https://app.all-hands.dev/conversations/conv-123"
+            "conversation_url": "https://app.z8l-agent.dev/conversations/conv-123"
         },
     )
     monkeypatch.setattr(
@@ -1885,7 +1885,7 @@ def test_issue_duplicate_main_reports_output_write_failures(monkeypatch, tmp_pat
         module,
         "poll_conversation",
         lambda app_conversation_id, poll_interval_seconds, max_wait_seconds: {
-            "conversation_url": "https://app.all-hands.dev/conversations/conv-123"
+            "conversation_url": "https://app.z8l-agent.dev/conversations/conv-123"
         },
     )
     monkeypatch.setattr(
@@ -1953,7 +1953,7 @@ def test_issue_duplicate_main_rejects_non_string_session_api_key(monkeypatch, tm
         module,
         "poll_conversation",
         lambda app_conversation_id, poll_interval_seconds, max_wait_seconds: {
-            "conversation_url": "https://app.all-hands.dev/conversations/conv-123",
+            "conversation_url": "https://app.z8l-agent.dev/conversations/conv-123",
             "session_api_key": {"bad": True},
         },
     )

@@ -13,7 +13,7 @@ Key concepts demonstrated:
 3. Custom follow-up prompt generation via critic.get_followup_prompt()
 4. Iterating until the task is completed successfully or max iterations reached
 
-For All-Hands LLM proxy (llm-proxy.*.all-hands.dev), the critic is auto-configured
+For the z8l-agent LLM proxy (llm-proxy.*.z8l-agent.dev), the critic is auto-configured
 using the same base_url with /vllm suffix and "critic" as the model name.
 """
 
@@ -51,7 +51,7 @@ def get_required_env(name: str) -> str:
 def get_default_critic(llm: LLM) -> CriticBase | None:
     """Auto-configure critic for All-Hands LLM proxy.
 
-    When the LLM base_url matches `llm-proxy.*.all-hands.dev`, returns an
+    When the LLM base_url matches `llm-proxy.*.z8l-agent.dev`, returns an
     APIBasedCritic configured with:
     - server_url: {base_url}/vllm
     - api_key: same as LLM
@@ -68,7 +68,7 @@ def get_default_critic(llm: LLM) -> CriticBase | None:
         llm = LLM(
             model="anthropic/claude-sonnet-4-5",
             api_key=api_key,
-            base_url="https://llm-proxy.eval.all-hands.dev",
+            base_url="https://llm-proxy.eval.z8l-agent.dev",
         )
         critic = get_default_critic(llm)
         if critic is None:
@@ -84,7 +84,7 @@ def get_default_critic(llm: LLM) -> CriticBase | None:
     if base_url is None or api_key is None:
         return None
 
-    # Match: llm-proxy.{env}.all-hands.dev (e.g., staging, prod, eval)
+    # Match: llm-proxy.{env}.z8l-agent.dev (e.g., staging, prod, eval)
     pattern = r"^https?://llm-proxy\.[^./]+\.all-hands\.dev"
     if not re.match(pattern, base_url):
         return None

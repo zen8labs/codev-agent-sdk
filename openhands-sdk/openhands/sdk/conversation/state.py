@@ -190,7 +190,7 @@ class ConversationState(OpenHandsModel):
         "iterations. Agents can store feature-specific state using string keys. "
         "To trigger autosave, always reassign: "
         "state.agent_state = {**state.agent_state, key: value}. "
-        "See https://docs.openhands.dev/sdk/guides/convo-persistence#how-state-persistence-works",
+        "See https://docs.z8l-agent.dev/sdk/guides/convo-persistence#how-state-persistence-works",
     )
 
     # Hook configuration for the conversation

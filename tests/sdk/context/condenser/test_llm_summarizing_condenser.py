@@ -57,7 +57,7 @@ def mock_llm() -> LLM:
     mock_llm.format_messages_for_llm = lambda messages: messages
 
     # Mock the required attributes that the LLM validator reads
-    mock_llm.openrouter_site_url = "https://docs.all-hands.dev/"
+    mock_llm.openrouter_site_url = "https://docs.z8l-agent.dev/"
     mock_llm.openrouter_app_name = "OpenHands"
     mock_llm.aws_access_key_id = None
     mock_llm.aws_secret_access_key = None

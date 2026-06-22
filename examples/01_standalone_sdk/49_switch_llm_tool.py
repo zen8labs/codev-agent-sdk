@@ -5,7 +5,7 @@ GPT profile, asks the agent to call the switch_llm tool, and then verifies that
 future model calls use the Claude profile.
 
 Usage:
-    LLM_API_KEY=... LLM_BASE_URL=https://llm-proxy.app.all-hands.dev \
+    LLM_API_KEY=... LLM_BASE_URL=https://llm-proxy.app.z8l-agent.dev \
         uv run python examples/01_standalone_sdk/49_switch_llm_tool.py
 """
 
@@ -19,7 +19,7 @@ from openhands.sdk.llm.llm_profile_store import LLMProfileStore
 
 GPT_PROFILE = "example-gpt55"
 CLAUDE_PROFILE = "example-claude"
-DEFAULT_BASE_URL = "https://llm-proxy.app.all-hands.dev"
+DEFAULT_BASE_URL = "https://llm-proxy.app.z8l-agent.dev"
 GPT_MODEL = "openai/gpt-5.5"
 CLAUDE_MODEL = "openai/prod/claude-sonnet-4-5-20250929"
 

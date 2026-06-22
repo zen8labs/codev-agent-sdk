@@ -17,7 +17,7 @@ def test_critic_client_uses_current_default_route():
     """Default critic route should target the hosted proxy pass-through."""
     client = CriticClient(api_key="test_api_key_123")
 
-    assert DEFAULT_CRITIC_SERVER_URL == "https://llm-proxy.app.all-hands.dev/vllm"
+    assert DEFAULT_CRITIC_SERVER_URL == "https://llm-proxy.app.z8l-agent.dev/vllm"
     assert DEFAULT_CRITIC_MODEL_NAME == "critic"
     assert client.server_url == DEFAULT_CRITIC_SERVER_URL
     assert client.model_name == DEFAULT_CRITIC_MODEL_NAME

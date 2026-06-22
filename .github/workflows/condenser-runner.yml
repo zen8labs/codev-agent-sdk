@@ -93,7 +93,7 @@ jobs:
               env:
                   LLM_CONFIG: ${{ toJson(matrix.job-config.llm-config) }}
                   LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
-                  LLM_BASE_URL: https://llm-proxy.app.all-hands.dev
+                  LLM_BASE_URL: https://llm-proxy.app.z8l-agent.dev
               run: |
                   set -eo pipefail
 
@@ -240,6 +240,6 @@ jobs:
                   cat consolidated_report.md >> final_report.md
 
                   # Sanitize @OpenHands mentions to prevent self-mention loops
-                  COMMENT_BODY=$(uv run python -c "from openhands.sdk.utils.github import sanitize_openhands_mentions; import sys; print(sanitize_openhands_mentions(sys.stdin.read()), end='')" < final_report.md)
+                  COMMENT_BODY=$(uv run python -c "from openhands.sdk.utils.github import sanitize_agent_mentions; import sys; print(sanitize_agent_mentions(sys.stdin.read()), end='')" < final_report.md)
                   # Use GitHub CLI to create comment with explicit PR number
                   printf '%s' "$COMMENT_BODY" | gh pr comment "$PR_NUMBER" --body-file -

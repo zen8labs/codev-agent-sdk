@@ -22,7 +22,7 @@ jobs:
           prompt: .github/prompts/update-documentation.md
           repository: ${{ github.repository }}
           selected-branch: main
-          base-url: https://app.all-hands.dev
+          base-url: https://app.z8l-agent.dev
           poll: "true"
           timeout-seconds: 1800
           poll-interval-seconds: 30

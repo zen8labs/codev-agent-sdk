@@ -1,4 +1,4 @@
-"""Startup banner for OpenHands SDK.
+"""Startup banner for z8l-agent SDK.
 
 Prints a welcome message with helpful links when the SDK is first imported.
 Can be suppressed by setting the OPENHANDS_SUPPRESS_BANNER environment variable.
@@ -13,7 +13,7 @@ _BANNER_PRINTED = False
 
 
 def _print_banner(version: str) -> None:
-    """Print the OpenHands SDK startup banner to stderr."""
+    """Print the z8l-agent SDK startup banner to stderr."""
     global _BANNER_PRINTED
 
     # Check if banner should be suppressed (check this first, before setting flag)
@@ -31,11 +31,11 @@ def _print_banner(version: str) -> None:
 
     banner = f"""\
 +----------------------------------------------------------------------+
-|  OpenHands SDK v{version:<53}|
+|  z8l-agent SDK v{version:<53}|
 |                                                                      |
-|  Report a bug: github.com/OpenHands/software-agent-sdk/issues        |
-|  Get help: openhands.dev/joinslack                                   |
-|  Scale up: openhands.dev/product/sdk                                 |
+|  Report a bug: github.com/z8l-agent/software-agent-sdk/issues        |
+|  Get help: z8l-agent.dev/joinslack                                   |
+|  Scale up: z8l-agent.dev/product/sdk                                 |
 |                                                                      |
 |  Set OPENHANDS_SUPPRESS_BANNER=1 to hide this message                |
 +----------------------------------------------------------------------+

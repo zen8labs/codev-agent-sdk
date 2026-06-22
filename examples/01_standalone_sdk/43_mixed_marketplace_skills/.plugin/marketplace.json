@@ -2,7 +2,7 @@
     "name": "mixed-skills-marketplace",
     "owner": {
         "name": "OpenHands Team",
-        "email": "contact@all-hands.dev"
+        "email": "contact@z8l-agent.dev"
     },
     "description": "Example marketplace with both local and remote skills",
     "plugins": [],

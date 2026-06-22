@@ -48,7 +48,7 @@ server_image = f"ghcr.io/openhands/agent-server:{server_image_sha[:7]}-python-am
 logger.info(f"Using server image: {server_image}")
 
 with APIRemoteWorkspace(
-    runtime_api_url=os.getenv("RUNTIME_API_URL", "https://runtime.eval.all-hands.dev"),
+    runtime_api_url=os.getenv("RUNTIME_API_URL", "https://runtime.eval.z8l-agent.dev"),
     runtime_api_key=runtime_api_key,
     server_image=server_image,
     image_pull_policy="Always",

@@ -89,8 +89,8 @@ def generate_title_with_llm(message: str, llm: LLM, max_length: int = 50) -> str
                     TextContent(
                         text=(
                             "You are a helpful assistant that generates concise, "
-                            "descriptive titles for conversations with OpenHands. "
-                            "OpenHands is a helpful AI agent that can interact "
+                            "descriptive titles for conversations with z8l-agent. "
+                            "z8l-agent is a helpful AI agent that can interact "
                             "with a computer to solve tasks using bash terminal, "
                             "file editor, and browser. Given a user message "
                             "(which may be truncated), generate a concise, "

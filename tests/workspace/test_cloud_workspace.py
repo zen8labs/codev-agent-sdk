@@ -388,7 +388,7 @@ def test_resume_existing_sandbox_sets_internal_id():
 
 # --- local_agent_server_mode tests ---
 
-_CLOUD_URL = "https://app.all-hands.dev"
+_CLOUD_URL = "https://app.z8l-agent.dev"
 _CLOUD_KEY = "test-key"
 
 
@@ -476,11 +476,11 @@ def test_local_agent_server_mode_port_from_env(monkeypatch):
 def test_local_agent_server_mode_cloud_credentials_available():
     """Cloud API fields are available for get_llms / get_secrets."""
     workspace = _make_local_workspace(
-        cloud_api_url="https://app.all-hands.dev/",
+        cloud_api_url="https://app.z8l-agent.dev/",
         cloud_api_key="my-key",
     )
 
-    assert workspace.cloud_api_url == "https://app.all-hands.dev"
+    assert workspace.cloud_api_url == "https://app.z8l-agent.dev"
     assert workspace._api_headers == {"Authorization": "Bearer my-key"}
     workspace.cleanup()
 

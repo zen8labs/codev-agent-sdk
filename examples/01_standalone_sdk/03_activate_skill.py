@@ -58,7 +58,7 @@ tools = [
 #       system_prompt_kwargs={"cli_mode": True, "repo": "my-project"},
 #   )
 #
-# See: https://docs.openhands.dev/sdk/guides/skill#customizing-system-prompts
+# See: https://docs.z8l-agent.dev/sdk/guides/skill#customizing-system-prompts
 agent_context = AgentContext(
     skills=[
         Skill(

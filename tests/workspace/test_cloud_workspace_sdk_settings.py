@@ -20,7 +20,7 @@ from openhands.workspace.cloud.workspace import OpenHandsCloudWorkspace
 
 SANDBOX_ID = "sb-test-123"
 SESSION_KEY = "session-key-abc"
-CLOUD_URL = "https://app.all-hands.dev"
+CLOUD_URL = "https://app.z8l-agent.dev"
 
 
 @pytest.fixture

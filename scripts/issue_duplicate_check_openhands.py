@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 
-OPENHANDS_BASE_URL = os.environ.get("OPENHANDS_BASE_URL", "https://app.all-hands.dev")
+OPENHANDS_BASE_URL = os.environ.get("OPENHANDS_BASE_URL", "https://app.z8l-agent.dev")
 REPOSITORY_PATTERN = re.compile(r"^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$")
 GITHUB_API_BASE_URL = os.environ.get("GITHUB_API_BASE_URL", "https://api.github.com")
 FAILED_EXECUTION_STATUSES = {
