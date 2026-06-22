@@ -20,6 +20,7 @@ from openhands.agent_server.conversation_lease import (
 from openhands.agent_server.conversation_service import (
     AutoTitleSubscriber,
     ConversationService,
+    _generate_initial_conversation_title,
     _get_worktree_start_point,
 )
 from openhands.agent_server.event_service import EventService
@@ -2490,6 +2491,7 @@ class TestAutoTitle:
         mock_conversation = MagicMock()
         mock_conversation.agent.llm = stored.agent.llm
         service._conversation = mock_conversation
+        service.get_conversation.return_value = mock_conversation
         return service
 
     def _user_message_event(self, text: str = "Fix the login bug") -> MessageEvent:
@@ -2516,6 +2518,17 @@ class TestAutoTitle:
             await asyncio.sleep(step)
             if predicate():
                 return
+
+    @pytest.mark.asyncio
+    async def test_initial_message_title_is_ready_before_create_returns(self):
+        service = self._make_service()
+        message = Message(role="user", content=[TextContent(text="Fix login bug")])
+
+        with patch(self._GENERATE_TITLE_PATH, return_value="🐛 Fix Login Bug"):
+            await _generate_initial_conversation_title(service, message)
+
+        assert service.stored.title == "🐛 Fix Login Bug"
+        service.save_meta.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_autotitle_sets_title_on_first_user_message(self):

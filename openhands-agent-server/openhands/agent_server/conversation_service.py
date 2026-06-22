@@ -333,6 +333,37 @@ def _compose_webhook_conversation_info_sync(
         return _compose_webhook_conversation_info(stored, state)
 
 
+async def _generate_initial_conversation_title(
+    event_service: EventService,
+    message: Message,
+) -> None:
+    if not event_service.stored.autotitle or event_service.stored.title is not None:
+        return
+
+    message_event = MessageEvent(source="user", llm_message=message)
+    message_text = extract_message_text(message_event)
+    if not message_text:
+        return
+
+    title_llm = AutoTitleSubscriber(service=event_service)._load_title_llm()
+    if title_llm is None:
+        conversation = event_service.get_conversation()
+        title_llm = conversation.agent.llm if conversation else None
+
+    loop = asyncio.get_running_loop()
+    title = await loop.run_in_executor(
+        None,
+        generate_title_from_message,
+        message_text,
+        title_llm,
+        50,
+    )
+    if title and event_service.stored.title is None:
+        event_service.stored.title = title
+        event_service.stored.updated_at = utc_now()
+        await event_service.save_meta()
+
+
 def _register_agent_definitions(
     agent_defs: list["AgentDefinition"],
     *,
@@ -698,6 +729,7 @@ class ConversationService:
                 role=initial_message.role, content=initial_message.content
             )
             await event_service.send_message(message, True)
+            await _generate_initial_conversation_title(event_service, message)
 
         state = await event_service.get_state()
         conversation_info = _compose_conversation_info(event_service.stored, state)
