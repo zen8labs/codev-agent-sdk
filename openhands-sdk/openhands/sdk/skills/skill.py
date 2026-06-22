@@ -36,7 +36,7 @@ from openhands.sdk.skills.utils import (
     validate_skill_name,
 )
 from openhands.sdk.utils import DEFAULT_TRUNCATE_NOTICE, maybe_truncate
-from openhands.sdk.utils.path import to_posix_path
+from openhands.sdk.utils.path import oh_home, to_posix_path
 
 
 logger = get_logger(__name__)
@@ -683,7 +683,7 @@ def load_skills_from_dir(
     Note, legacy repo instructions will not be loaded here.
 
     Args:
-        skill_dir: Path to the skills directory (e.g. .openhands/skills)
+        skill_dir: Path to the skills directory (e.g. .z8l-agent/skills)
 
     Returns:
         Tuple of (repo_skills, knowledge_skills, agent_skills) dictionaries.
@@ -739,20 +739,20 @@ def load_skills_from_dir(
 # Default user skills directories (in order of priority)
 USER_SKILLS_DIRS = [
     Path.home() / ".agents" / "skills",
-    Path.home() / ".openhands" / "skills",
-    Path.home() / ".openhands" / "microagents",  # Legacy support
+    oh_home() / "skills",
+    oh_home() / "microagents",  # Legacy support
 ]
 
 
 def load_user_skills() -> list[Skill]:
     """Load skills from user's home directory.
 
-    Searches for skills in ~/.agents/skills/, ~/.openhands/skills/, and
-    ~/.openhands/microagents/ (legacy). Skills from all directories are merged,
+    Searches for skills in ~/.agents/skills/, ~/.z8l-agent/skills/, and
+    ~/.z8l-agent/microagents/ (legacy). Skills from all directories are merged,
     with earlier entries in USER_SKILLS_DIRS taking precedence for duplicate
     names.
 
-    Also loads enabled installed skills from ~/.openhands/skills/installed/
+    Also loads enabled installed skills from ~/.z8l-agent/skills/installed/
     (managed via install_skill/uninstall_skill). Installed skills have lower
     precedence than user skills from the directories above.
 
@@ -853,7 +853,7 @@ def _load_and_merge_from_dirs(
 def load_project_skills(work_dir: str | Path) -> list[Skill]:
     """Load skills from project-specific directories.
 
-    Searches for skills in {work_dir}/.agents/skills/, {work_dir}/.openhands/skills/,
+    Searches for skills in {work_dir}/.agents/skills/, {work_dir}/.z8l-agent/skills/,
     and {work_dir}/.openhands/microagents/ (legacy).
 
     If the working directory is inside a Git repository, this function also loads
@@ -863,10 +863,10 @@ def load_project_skills(work_dir: str | Path) -> list[Skill]:
     Skills are merged in priority order, with the *working directory* taking
     precedence over the Git repo root when duplicates exist.
 
-    Use .agents/skills for new skills. .openhands/skills is the legacy OpenHands
+    Use .agents/skills for new skills. .z8l-agent/skills is the legacy OpenHands
     location, and .openhands/microagents is deprecated.
 
-    Example: If "my-skill" exists in both .agents/skills/ and .openhands/skills/,
+    Example: If "my-skill" exists in both .agents/skills/ and .z8l-agent/skills/,
     the version from .agents/skills/ is used.
 
     Also loads third-party skill files (AGENTS.md, .cursorrules, etc.) from the
@@ -893,7 +893,7 @@ def load_project_skills(work_dir: str | Path) -> list[Skill]:
         search_roots.append(git_root)
 
     # First, load third-party skill files (AGENTS.md, .cursorrules, etc.) from each
-    # search root. This ensures they are loaded even if .openhands/skills doesn't
+    # search root. This ensures they are loaded even if .z8l-agent/skills doesn't
     # exist.
     for root in search_roots:
         third_party_files = find_third_party_files(
@@ -909,13 +909,13 @@ def load_project_skills(work_dir: str | Path) -> list[Skill]:
             except (SkillError, OSError, yaml.YAMLError) as e:
                 logger.warning(f"Failed to load third-party skill from {path}: {e}")
 
-    # Load project-specific skills from .agents/skills, .openhands/skills,
+    # Load project-specific skills from .agents/skills, .z8l-agent/skills,
     # and legacy microagents (priority order; first wins for duplicates)
     for root in search_roots:
         project_skills_dirs = [
             root / ".agents" / "skills",
-            root / ".openhands" / "skills",
-            root / ".openhands" / "microagents",  # Legacy support
+            root / ".z8l-agent" / "skills",
+            root / ".z8l-agent" / "microagents",  # Legacy support
         ]
 
         _load_and_merge_from_dirs(
@@ -1021,7 +1021,7 @@ def load_public_skills(
 
     This function maintains a local git clone of the public skills registry at
     https://github.com/OpenHands/extensions. On first run, it clones the repository
-    to ~/.openhands/skills-cache/. On subsequent runs within the same process, it
+    to ~/.z8l-agent/skills-cache/. On subsequent runs within the same process, it
     returns cached results. For branch refs it re-fetches after the cache TTL; for
     tags and commit SHAs (immutable refs) the cache never expires so no further
     network calls are made.

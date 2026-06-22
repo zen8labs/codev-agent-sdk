@@ -128,10 +128,10 @@ def test_tool_different_tool_types():
 
     # TaskTrackerTool
     tracker_tool = Tool(
-        name="TaskTrackerTool", params={"save_dir": "/workspace/.openhands"}
+        name="TaskTrackerTool", params={"save_dir": "/workspace/.z8l-agent"}
     )
     assert tracker_tool.name == "TaskTrackerTool"
-    assert tracker_tool.params["save_dir"] == "/workspace/.openhands"
+    assert tracker_tool.params["save_dir"] == "/workspace/.z8l-agent"
 
 
 def test_tool_nested_params():

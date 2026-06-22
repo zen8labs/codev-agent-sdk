@@ -38,7 +38,7 @@ def mock_installed_skill_info():
         resolved_ref="abc123",
         repo_path=None,
         installed_at="2024-01-01T00:00:00Z",
-        install_path=Path("/home/user/.openhands/skills/installed/test-skill"),
+        install_path=Path("/home/user/.z8l-agent/skills/installed/test-skill"),
     )
 
 
@@ -95,7 +95,7 @@ class TestGetSkillsEndpoint:
                     "org_config": {
                         "repository": "myorg/myrepo",
                         "provider": "github",
-                        "org_repo_url": "https://github.com/myorg/.openhands",
+                        "org_repo_url": "https://github.com/myorg/.z8l-agent",
                         "org_name": "myorg",
                     },
                 },
@@ -104,7 +104,7 @@ class TestGetSkillsEndpoint:
             assert response.status_code == 200
             mock_load.assert_called_once()
             call_kwargs = mock_load.call_args[1]
-            assert call_kwargs["org_repo_url"] == "https://github.com/myorg/.openhands"
+            assert call_kwargs["org_repo_url"] == "https://github.com/myorg/.z8l-agent"
             assert call_kwargs["org_name"] == "myorg"
 
     def test_get_skills_with_sandbox_config(self, client):
@@ -309,7 +309,7 @@ class TestPydanticModels:
                     "org_config": {
                         "repository": "org/repo",
                         "provider": "github",
-                        "org_repo_url": "https://github.com/org/.openhands",
+                        "org_repo_url": "https://github.com/org/.z8l-agent",
                         "org_name": "org",
                     }
                 },

@@ -876,7 +876,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
             project_dirs: List of directories to load project skills from.
                 If None, uses self.working_dir only.
             load_public: Load public skills from OpenHands/extensions repo.
-            load_user: Load user skills from ~/.openhands/skills/.
+            load_user: Load user skills from ~/.z8l-agent/skills/.
             load_project: Load project skills from workspace directories.
             load_org: Load organization-level skills.
             timeout: Request timeout in seconds.

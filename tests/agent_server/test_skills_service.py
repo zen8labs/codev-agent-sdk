@@ -152,7 +152,7 @@ class TestLoadOrgSkillsFromUrl:
             mock_run.side_effect = Exception("Git not found")
 
             result = load_org_skills_from_url(
-                org_repo_url="https://github.com/org/.openhands",
+                org_repo_url="https://github.com/org/.z8l-agent",
                 org_name="test-org",
             )
 
@@ -169,7 +169,7 @@ class TestLoadOrgSkillsFromUrl:
             )
 
             result = load_org_skills_from_url(
-                org_repo_url="https://github.com/org/.openhands",
+                org_repo_url="https://github.com/org/.z8l-agent",
                 org_name="test-org",
             )
 
@@ -186,7 +186,7 @@ class TestLoadOrgSkillsFromUrl:
             )
 
             result = load_org_skills_from_url(
-                org_repo_url="https://github.com/org/.openhands",
+                org_repo_url="https://github.com/org/.z8l-agent",
                 org_name="test-org",
             )
 
@@ -204,7 +204,7 @@ class TestLoadOrgSkillsFromUrl:
                 )
 
                 result = load_org_skills_from_url(
-                    org_repo_url="https://github.com/org/.openhands",
+                    org_repo_url="https://github.com/org/.z8l-agent",
                     org_name="test-org",
                     working_dir=tmpdir,
                 )

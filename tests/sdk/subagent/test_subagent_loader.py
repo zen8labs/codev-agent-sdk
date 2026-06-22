@@ -100,7 +100,7 @@ def test_load_project_agents_skips_readme(tmp_path: Path) -> None:
 
 def test_load_project_agents_from_openhands_dir(tmp_path: Path) -> None:
     """Loads .md files from .openhands/ when .agents/ does not exist."""
-    oh_dir = tmp_path / ".openhands" / "agents"
+    oh_dir = tmp_path / ".z8l-agent" / "agents"
     oh_dir.mkdir(parents=True)
 
     (oh_dir / "legacy-agent.md").write_text(
@@ -120,7 +120,7 @@ def test_load_project_agents_agents_dir_wins_over_openhands(tmp_path: Path) -> N
         "---\nname: shared\ndescription: From .agents\n---\nAgents prompt."
     )
 
-    oh_dir = tmp_path / ".openhands" / "agents"
+    oh_dir = tmp_path / ".z8l-agent" / "agents"
     oh_dir.mkdir(parents=True)
     (oh_dir / "shared.md").write_text(
         "---\nname: shared\ndescription: From .openhands\n---\nOH prompt."
@@ -147,7 +147,7 @@ def test_load_project_agents_merges_both_dirs(tmp_path: Path) -> None:
         "---\nname: agent-a\ndescription: A\n---\nA."
     )
 
-    oh_dir = tmp_path / ".openhands" / "agents"
+    oh_dir = tmp_path / ".z8l-agent" / "agents"
     oh_dir.mkdir(parents=True)
     (oh_dir / "agent-b.md").write_text("---\nname: agent-b\ndescription: B\n---\nB.")
 
@@ -174,7 +174,7 @@ def test_load_user_agents(tmp_path: Path) -> None:
 
 def test_load_user_agents_from_openhands_dir(tmp_path: Path) -> None:
     """Loads from ~/.openhands/ when ~/.agents/ does not exist."""
-    oh_dir = tmp_path / ".openhands" / "agents"
+    oh_dir = tmp_path / ".z8l-agent" / "agents"
     oh_dir.mkdir(parents=True)
 
     (oh_dir / "legacy-user.md").write_text(
@@ -196,7 +196,7 @@ def test_load_user_agents_agents_dir_wins_over_openhands(tmp_path: Path) -> None
         "---\nname: shared\ndescription: From .agents\n---\nAgents."
     )
 
-    oh_dir = tmp_path / ".openhands" / "agents"
+    oh_dir = tmp_path / ".z8l-agent" / "agents"
     oh_dir.mkdir(parents=True)
     (oh_dir / "shared.md").write_text(
         "---\nname: shared\ndescription: From .openhands\n---\nOH."

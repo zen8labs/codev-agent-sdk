@@ -233,7 +233,7 @@ def _atomic_write_json(path: Path, data: dict) -> None:
 
 
 # Default storage directory (relative to working directory)
-DEFAULT_PERSISTENCE_DIR = Path("workspace/.openhands")
+DEFAULT_PERSISTENCE_DIR = Path("workspace/.z8l-agent")
 
 
 class SettingsStore(ABC):
@@ -699,7 +699,7 @@ def _get_persistence_dir(config: Config | None = None) -> Path:
 
     # Use config's conversations_path parent if available
     if config is not None:
-        return config.conversations_path.parent / ".openhands"
+        return config.conversations_path.parent / ".z8l-agent"
 
     return DEFAULT_PERSISTENCE_DIR
 

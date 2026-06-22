@@ -86,7 +86,7 @@ class SkillsRequest(BaseModel):
         default=True, description="Load public skills from OpenHands/extensions repo"
     )
     load_user: bool = Field(
-        default=True, description="Load user skills from ~/.openhands/skills/"
+        default=True, description="Load user skills from ~/.z8l-agent/skills/"
     )
     load_project: bool = Field(
         default=True, description="Load project skills from workspace"
@@ -250,9 +250,9 @@ def get_skills(request: SkillsRequest) -> SkillsResponse:
     precedence (later overrides earlier for duplicate names):
     1. Sandbox skills (lowest) - Exposed URLs from sandbox
     2. Public skills - From GitHub OpenHands/extensions repository
-    3. User skills - From ~/.openhands/skills/
-    4. Organization skills - From {org}/.openhands or equivalent
-    5. Project skills (highest) - From {workspace}/.openhands/skills/
+    3. User skills - From ~/.z8l-agent/skills/
+    4. Organization skills - From {org}/.z8l-agent or equivalent
+    5. Project skills (highest) - From {workspace}/.z8l-agent/skills/
 
     Args:
         request: SkillsRequest containing configuration for which sources to load.
@@ -340,7 +340,7 @@ def install_skill_endpoint(request: InstallSkillRequest) -> InstalledSkillRespon
     """Install a skill from a source.
 
     Installs a skill from a git URL, GitHub shorthand, or local path into
-    the user's installed skills directory (~/.openhands/skills/installed/).
+    the user's installed skills directory (~/.z8l-agent/skills/installed/).
 
     Args:
         request: InstallSkillRequest containing source and options.
@@ -383,7 +383,7 @@ def list_installed_skills_endpoint() -> InstalledSkillsListResponse:
     """List all installed skills.
 
     Returns a list of all skills installed in the user's installed skills
-    directory (~/.openhands/skills/installed/).
+    directory (~/.z8l-agent/skills/installed/).
 
     Returns:
         InstalledSkillsListResponse containing list of installed skills.

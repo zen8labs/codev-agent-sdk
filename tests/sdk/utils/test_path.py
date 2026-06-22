@@ -38,7 +38,7 @@ def test_is_local_path_source_detects_backslash_path_syntax():
 def test_is_local_path_source_detects_dot_paths():
     assert is_local_path_source(".")
     assert is_local_path_source("..")
-    assert is_local_path_source(".openhands")
+    assert is_local_path_source(".z8l-agent")
 
 
 def test_is_absolute_path_source_detects_posix_and_windows_paths():

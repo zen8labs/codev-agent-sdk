@@ -16,11 +16,12 @@ from openhands.sdk.extensions.installation.metadata import (
 )
 from openhands.sdk.extensions.installation.utils import validate_extension_name
 from openhands.sdk.logger import get_logger
+from openhands.sdk.utils.path import oh_home
 
 
 logger = get_logger(__name__)
 
-DEFAULT_CACHE_DIR = Path.home() / ".openhands" / "cache" / "extensions"
+DEFAULT_CACHE_DIR = oh_home() / "cache" / "extensions"
 
 
 @dataclass

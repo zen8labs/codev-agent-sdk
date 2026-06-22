@@ -33,10 +33,10 @@ class HooksResponse(BaseModel):
 
 @hooks_router.post("", response_model=HooksResponse)
 def get_hooks(request: HooksRequest) -> HooksResponse:
-    """Load hooks from the workspace .openhands/hooks.json file.
+    """Load hooks from the workspace .z8l-agent/hooks.json file.
 
     This endpoint reads the hooks configuration from the project's
-    .openhands/hooks.json file if it exists.
+    .z8l-agent/hooks.json file if it exists.
 
     Args:
         request: HooksRequest containing the project directory path.

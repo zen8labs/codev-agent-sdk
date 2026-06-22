@@ -5,9 +5,9 @@ keeping the router clean and focused on HTTP concerns.
 
 Skill Sources:
 - Public skills: GitHub OpenHands/extensions repository
-- User skills: ~/.openhands/skills/ and ~/.openhands/microagents/
-- Project skills: {workspace}/.openhands/skills/, .cursorrules, agents.md
-- Organization skills: {org}/.openhands or {org}/openhands-config
+- User skills: ~/.z8l-agent/skills/ and ~/.z8l-agent/microagents/
+- Project skills: {workspace}/.z8l-agent/skills/, .cursorrules, agents.md
+- Organization skills: {org}/.z8l-agent or {org}/openhands-config
 - Sandbox skills: Exposed URLs from sandbox environment
 
 Precedence (later overrides earlier):
@@ -305,13 +305,13 @@ def load_all_skills(
     precedence (later overrides earlier for duplicate names):
     1. Sandbox skills (lowest) - Exposed URLs from sandbox
     2. Public skills - From GitHub OpenHands/extensions repository
-    3. User skills - From ~/.openhands/skills/
-    4. Organization skills - From {org}/.openhands or equivalent
-    5. Project skills (highest) - From {workspace}/.openhands/skills/
+    3. User skills - From ~/.z8l-agent/skills/
+    4. Organization skills - From {org}/.z8l-agent or equivalent
+    5. Project skills (highest) - From {workspace}/.z8l-agent/skills/
 
     Args:
         load_public: Whether to load public skills from OpenHands/extensions repo.
-        load_user: Whether to load user skills from ~/.openhands/skills/.
+        load_user: Whether to load user skills from ~/.z8l-agent/skills/.
         load_project: Whether to load project skills from workspace.
         load_org: Whether to load organization-level skills.
         project_dir: Workspace directory path for project skills.
@@ -428,7 +428,7 @@ def service_install_skill(
         repo_path: Subdirectory path within the repository (for monorepos).
         force: If True, overwrite existing installation.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         InstalledSkillInfo with details about the installation.
@@ -456,7 +456,7 @@ def service_uninstall_skill(
     Args:
         name: Name of the skill to uninstall.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         True if the skill was uninstalled, False if it wasn't installed.
@@ -473,7 +473,7 @@ def service_enable_skill(
     Args:
         name: Name of the skill to enable.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         True if the skill was enabled, False if it wasn't found.
@@ -490,7 +490,7 @@ def service_disable_skill(
     Args:
         name: Name of the skill to disable.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         True if the skill was disabled, False if it wasn't found.
@@ -507,7 +507,7 @@ def service_list_installed_skills(
 
     Args:
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         List of InstalledSkillInfo objects for all installed skills.
@@ -524,7 +524,7 @@ def service_get_installed_skill(
     Args:
         name: Name of the skill to get.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         InstalledSkillInfo if found, None otherwise.
@@ -541,7 +541,7 @@ def service_update_skill(
     Args:
         name: Name of the skill to update.
         installed_dir: Directory for installed skills.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         Updated InstalledSkillInfo if successful, None if skill not found.
@@ -597,7 +597,7 @@ def service_get_marketplace_catalog(
         marketplace_path: Relative path to marketplace JSON file.
             Defaults to marketplaces/default.json.
         installed_dir: Directory for installed skills to check status.
-            Defaults to ~/.openhands/skills/installed/.
+            Defaults to ~/.z8l-agent/skills/installed/.
 
     Returns:
         List of MarketplaceSkillInfo with skill details and installation status.

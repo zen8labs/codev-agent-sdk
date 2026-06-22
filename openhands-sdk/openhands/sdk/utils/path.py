@@ -9,6 +9,20 @@ from pathlib import Path, PureWindowsPath
 
 _URL_SCHEME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9+.-]*://")
 
+_DEFAULT_HOME_DIR_NAME = ".z8l-agent"
+
+
+def oh_home() -> Path:
+    """Return the OpenHands user home directory.
+
+    Defaults to ``~/.z8l-agent`` but can be overridden via the ``OH_HOME``
+    environment variable (useful for deployments that need a different path).
+    """
+    override = os.getenv("OH_HOME")
+    if override:
+        return Path(override).expanduser()
+    return Path.home() / _DEFAULT_HOME_DIR_NAME
+
 
 def to_posix_path(path: str | os.PathLike[str]) -> str:
     """Return a slash-separated path string for wire/storage/display formats.

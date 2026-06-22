@@ -2054,7 +2054,7 @@ class ACPAgent(AgentBase):
         if state.persistence_dir:
             root = Path(state.persistence_dir) / "acp" / subdir
         else:
-            root = Path(state.workspace.working_dir) / ".openhands" / "acp" / subdir
+            root = Path(state.workspace.working_dir) / ".z8l-agent" / "acp" / subdir
         return Path(os.path.abspath(root))
 
     def _isolate_acp_data_dir(

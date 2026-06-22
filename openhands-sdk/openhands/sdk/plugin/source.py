@@ -12,7 +12,11 @@ from typing import NamedTuple
 
 from openhands.sdk.git.cached_repo import try_cached_clone_or_update
 from openhands.sdk.logger import get_logger
-from openhands.sdk.utils.path import is_absolute_path_source, is_local_path_source
+from openhands.sdk.utils.path import (
+    is_absolute_path_source,
+    is_local_path_source,
+    oh_home,
+)
 
 
 logger = get_logger(__name__)
@@ -21,7 +25,7 @@ GITHUB_URL_PATTERN = re.compile(
     r"^https://github\.com/(?P<owner>[^/]+)/(?P<repo>[^/]+)/"
     r"(?:blob|tree)/(?P<branch>[^/]+)/(?P<path>.+)$"
 )
-DEFAULT_CACHE_DIR = Path.home() / ".openhands" / "cache" / "git"
+DEFAULT_CACHE_DIR = oh_home() / "cache" / "git"
 
 
 class GitHubURLComponents(NamedTuple):

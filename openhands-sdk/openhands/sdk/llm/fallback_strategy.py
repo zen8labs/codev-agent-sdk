@@ -50,7 +50,7 @@ class FallbackStrategy(BaseModel):
     profile_store_dir: str | Path | None = Field(
         default=None,
         description="Path to directory containing profiles. "
-        "If not specified, defaults to `.openhands/profiles`.",
+        "If not specified, defaults to `.z8l-agent/profiles`.",
     )
 
     # Private: lazily resolved LLM instances

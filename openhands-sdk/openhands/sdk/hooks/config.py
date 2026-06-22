@@ -10,6 +10,7 @@ from typing import Any
 from pydantic import BaseModel, Field, model_validator
 
 from openhands.sdk.hooks.types import HookEventType
+from openhands.sdk.utils.path import oh_home
 
 
 logger = logging.getLogger(__name__)
@@ -159,7 +160,7 @@ class HookMatcher(BaseModel):
 class HookConfig(BaseModel):
     """Configuration for all hooks.
 
-    Hooks can be configured either by loading from `.openhands/hooks.json` or
+    Hooks can be configured either by loading from `.z8l-agent/hooks.json` or
     by directly instantiating with typed fields:
 
         # Direct instantiation with typed fields (recommended):
@@ -173,7 +174,7 @@ class HookConfig(BaseModel):
         )
 
         # Load from JSON file:
-        config = HookConfig.load(".openhands/hooks.json")
+        config = HookConfig.load(".z8l-agent/hooks.json")
     """
 
     model_config = {
@@ -273,19 +274,19 @@ class HookConfig(BaseModel):
     def load(
         cls, path: str | Path | None = None, working_dir: str | Path | None = None
     ) -> "HookConfig":
-        """Load config from path or search .openhands/hooks.json locations.
+        """Load config from path or search .z8l-agent/hooks.json locations.
 
         Args:
             path: Explicit path to hooks.json file. If provided, working_dir is ignored.
-            working_dir: Project directory for discovering .openhands/hooks.json.
+            working_dir: Project directory for discovering .z8l-agent/hooks.json.
                 Falls back to cwd if not provided.
         """
         if path is None:
             # Search for hooks.json in standard locations
             base_dir = Path(working_dir) if working_dir else Path.cwd()
             search_paths = [
-                base_dir / ".openhands" / "hooks.json",
-                Path.home() / ".openhands" / "hooks.json",
+                base_dir / ".z8l-agent" / "hooks.json",
+                oh_home() / "hooks.json",
             ]
             for search_path in search_paths:
                 if search_path.exists():

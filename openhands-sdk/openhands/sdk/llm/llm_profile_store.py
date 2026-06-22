@@ -16,6 +16,7 @@ from openhands.sdk.llm.utils.openhands_provider import (
     canonicalize_openhands_llm_payload,
 )
 from openhands.sdk.logger import get_logger
+from openhands.sdk.utils.path import oh_home
 from openhands.sdk.utils.pydantic_secrets import REDACTED_SECRET_VALUE
 
 
@@ -23,7 +24,7 @@ if TYPE_CHECKING:
     from openhands.sdk.llm.llm import LLM
     from openhands.sdk.utils.cipher import Cipher
 
-_DEFAULT_PROFILE_DIR: Final[Path] = Path.home() / ".openhands" / "profiles"
+_DEFAULT_PROFILE_DIR: Final[Path] = oh_home() / "profiles"
 _LOCK_TIMEOUT_SECONDS: Final[float] = 30.0
 
 # Profile names: 1-64 chars, must start with alphanumeric, then alphanumerics
@@ -48,7 +49,7 @@ class LLMProfileStore:
         Args:
             base_dir: Path to the directory where the profiles are stored.
                 If `None` is provided, the default directory is used, i.e.,
-                `~/.openhands/profiles`.
+                `~/.z8l-agent/profiles`.
         """
         self.base_dir = Path(base_dir) if base_dir is not None else _DEFAULT_PROFILE_DIR
         # ensure directory existence

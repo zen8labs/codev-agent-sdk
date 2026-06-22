@@ -14,12 +14,13 @@ from openhands.sdk.extensions.installation import (
     InstallationManager,
 )
 from openhands.sdk.plugin.plugin import Plugin
+from openhands.sdk.utils.path import oh_home
 
 
 # Public type alias — keeps existing import sites working.
 InstalledPluginInfo = InstallationInfo
 
-DEFAULT_INSTALLED_PLUGINS_DIR = Path.home() / ".openhands" / "plugins" / "installed"
+DEFAULT_INSTALLED_PLUGINS_DIR = oh_home() / "plugins" / "installed"
 
 
 def get_installed_plugins_dir() -> Path:
@@ -69,7 +70,7 @@ def install_plugin(
         ref: Optional branch, tag, or commit to install.
         repo_path: Subdirectory path within the repository (for monorepos).
         installed_dir: Directory for installed plugins.
-            Defaults to ``~/.openhands/plugins/installed/``.
+            Defaults to ``~/.z8l-agent/plugins/installed/``.
         force: If True, overwrite existing installation.
 
     Returns:

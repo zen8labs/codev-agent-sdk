@@ -14,7 +14,7 @@ _REPO_BASELINE_TEXT = (
 )
 # Different baseline formats for testing backward compatibility:
 # - _REPO_BASELINE_TEXT: legacy format with frontmatter (used in
-#   .openhands/skills/repo.md)
+#   .z8l-agent/skills/repo.md)
 # - _AGENTS_BASELINE_TEXT: simple markdown format (used in AGENTS.md)
 _AGENTS_BASELINE_TEXT = "# Project Guidelines\n\nRepo baseline\n"
 
@@ -24,11 +24,11 @@ def _write_repo_with_vendor_files(root: Path, baseline_source: str) -> None:
 
     Args:
         root: Root directory for the test repository
-        baseline_source: Either "repo_md" (legacy .openhands/skills/repo.md)
+        baseline_source: Either "repo_md" (legacy .z8l-agent/skills/repo.md)
                         or "agents_md" (AGENTS.md in repo root)
     """
     if baseline_source == "repo_md":
-        skills_dir = root / ".openhands" / "skills"
+        skills_dir = root / ".z8l-agent" / "skills"
         skills_dir.mkdir(parents=True, exist_ok=True)
         (skills_dir / "repo.md").write_text(_REPO_BASELINE_TEXT)
     elif baseline_source == "agents_md":
@@ -41,7 +41,7 @@ def _write_repo_with_vendor_files(root: Path, baseline_source: str) -> None:
 
 
 # Test both loading mechanisms for backward compatibility:
-# - "repo_md": Legacy .openhands/skills/repo.md (still supported for existing repos)
+# - "repo_md": Legacy .z8l-agent/skills/repo.md (still supported for existing repos)
 # - "agents_md": New approach using AGENTS.md in repo root (recommended)
 @pytest.mark.parametrize("baseline_source", ["repo_md", "agents_md"])
 def test_context_gates_claude_vendor_file(tmp_path: Path, baseline_source: str):

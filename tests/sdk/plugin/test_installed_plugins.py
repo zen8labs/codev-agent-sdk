@@ -73,7 +73,7 @@ def sample_plugin_dir(tmp_path: Path) -> Path:
 
 def test_get_installed_plugins_dir_returns_default_path():
     path = get_installed_plugins_dir()
-    assert ".openhands" in str(path)
+    assert ".z8l-agent" in str(path)
     assert "plugins" in str(path)
     assert "installed" in str(path)
 

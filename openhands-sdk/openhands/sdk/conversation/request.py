@@ -202,7 +202,7 @@ class StartConversationRequest(BaseModel):
         default=None,
         description=(
             "Optional LLM profile name for title generation. If set, the LLM "
-            "is loaded from LLMProfileStore (~/.openhands/profiles/) and used "
+            "is loaded from LLMProfileStore (~/.z8l-agent/profiles/) and used "
             "for LLM-based title generation. This enables using a fast/cheap "
             "model for titles regardless of the agent's main model. If not "
             "set (or profile loading fails), title generation falls back to "

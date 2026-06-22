@@ -59,7 +59,7 @@ def sample_skill_dir(tmp_path: Path) -> Path:
 
 def test_get_installed_skills_dir_returns_default_path() -> None:
     path = get_installed_skills_dir()
-    assert ".openhands" in str(path)
+    assert ".z8l-agent" in str(path)
     assert "skills" in str(path)
     assert "installed" in str(path)
 

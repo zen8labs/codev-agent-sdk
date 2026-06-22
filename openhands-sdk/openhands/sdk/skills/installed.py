@@ -17,7 +17,7 @@ from openhands.sdk.logger import get_logger
 from openhands.sdk.skills.exceptions import SkillValidationError
 from openhands.sdk.skills.skill import Skill
 from openhands.sdk.skills.utils import find_skill_md
-from openhands.sdk.utils.path import to_posix_path
+from openhands.sdk.utils.path import oh_home, to_posix_path
 
 
 logger = get_logger(__name__)
@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 # Public type alias — keeps existing import sites working.
 InstalledSkillInfo = InstallationInfo
 
-DEFAULT_INSTALLED_SKILLS_DIR = Path.home() / ".openhands" / "skills" / "installed"
+DEFAULT_INSTALLED_SKILLS_DIR = oh_home() / "skills" / "installed"
 
 
 def get_installed_skills_dir() -> Path:
@@ -82,7 +82,7 @@ def install_skill(
         ref: Optional branch, tag, or commit to install.
         repo_path: Subdirectory path within the repository (for monorepos).
         installed_dir: Directory for installed skills.
-            Defaults to ``~/.openhands/skills/installed/``.
+            Defaults to ``~/.z8l-agent/skills/installed/``.
         force: If True, overwrite existing installation.
 
     Returns:
@@ -165,7 +165,7 @@ def install_skills_from_marketplace(
         marketplace_path: Path to the directory containing
             ``.plugin/marketplace.json``.
         installed_dir: Directory for installed skills.
-            Defaults to ``~/.openhands/skills/installed/``.
+            Defaults to ``~/.z8l-agent/skills/installed/``.
         force: If True, overwrite existing installations.
 
     Returns:

@@ -7,7 +7,7 @@ It also provides support for plugin marketplaces - directories that list
 available plugins with their metadata and source locations.
 
 Additionally, it provides utilities for managing installed plugins in the
-user's home directory (~/.openhands/plugins/installed/).
+user's home directory (~/.z8l-agent/plugins/installed/).
 
 Note: Marketplace classes live in ``openhands.sdk.marketplace``.
 """

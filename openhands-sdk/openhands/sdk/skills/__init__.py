@@ -7,7 +7,7 @@ This module provides the unified API for working with skills:
 - `SkillResources` - Resource directories for a skill (scripts/, references/, assets/)
 - `load_skills_from_dir` - Load skills from a directory
 - `load_project_skills` - Load skills from project's .agents/skills/
-- `load_user_skills` - Load skills from ~/.openhands/skills/
+- `load_user_skills` - Load skills from ~/.z8l-agent/skills/
 - `load_public_skills` - Load skills from the public OpenHands extensions repo
 - `load_available_skills` - Load and merge skills from multiple sources
 - `merge_skills_by_name` - Merge two skill collections by name (primary wins)

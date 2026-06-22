@@ -79,8 +79,8 @@ class AgentContext(BaseModel):
     load_user_skills: bool = Field(
         default=False,
         description=(
-            "Whether to automatically load user skills from ~/.openhands/skills/ "
-            "and ~/.openhands/microagents/ (for backward compatibility). "
+            "Whether to automatically load user skills from ~/.z8l-agent/skills/ "
+            "and ~/.z8l-agent/microagents/ (for backward compatibility). "
         ),
         json_schema_extra={"acp_compatible": True},
     )
@@ -105,7 +105,7 @@ class AgentContext(BaseModel):
         default=False,
         description=(
             "Whether to automatically load project skills from the conversation "
-            "workspace (e.g. .openhands/skills/, AGENTS.md). Unlike "
+            "workspace (e.g. .z8l-agent/skills/, AGENTS.md). Unlike "
             "load_user_skills / load_public_skills, this flag is not resolved by "
             "AgentContext itself (the workspace path is unknown at validation "
             "time); LocalConversation resolves it lazily on the first "

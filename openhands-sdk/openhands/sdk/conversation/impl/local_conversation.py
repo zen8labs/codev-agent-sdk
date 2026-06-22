@@ -753,9 +753,9 @@ class LocalConversation(BaseConversation):
           2. Plugin agents (registered during plugin loading, i.e.,
                 in _ensure_plugins_loaded())
           3. Project-level file agents (`{project}/.agents/agents/*.md`,
-                then `{project}/.openhands/agents/*.md`)
+                then `{project}/.z8l-agent/agents/*.md`)
           4. User-level file agents (`~/.agents/agents/*.md`,
-                then `~/.openhands/agents/*.md`)
+                then `~/.z8l-agent/agents/*.md`)
         """
         # register project-level and then user-level file-based agents
         register_file_agents(self.workspace.working_dir)

@@ -12,6 +12,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from openhands.sdk.logger import get_logger
+from openhands.sdk.utils.path import oh_home
 
 
 logger = get_logger(__name__)
@@ -20,9 +21,10 @@ logger = get_logger(__name__)
 def get_credentials_dir() -> Path:
     """Get the directory for storing credentials.
 
-    Uses XDG_DATA_HOME if set, otherwise defaults to ~/.local/share/openhands.
+    Returns the auth directory under the OpenHands home directory
+    (see ``oh_home()``).
     """
-    return Path.home() / ".openhands" / "auth"
+    return oh_home() / "auth"
 
 
 class OAuthCredentials(BaseModel):

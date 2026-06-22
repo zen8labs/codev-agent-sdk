@@ -26,8 +26,8 @@ def temp_user_skills_dir():
         agents_dir = root / ".agents" / "skills"
         agents_dir.mkdir(parents=True)
 
-        # Create .openhands/skills directory
-        skills_dir = root / ".openhands" / "skills"
+        # Create .z8l-agent/skills directory
+        skills_dir = root / ".z8l-agent" / "skills"
         skills_dir.mkdir(parents=True)
 
         yield root, agents_dir, skills_dir
@@ -39,8 +39,8 @@ def temp_microagents_dir():
     with tempfile.TemporaryDirectory() as temp_dir:
         root = Path(temp_dir)
 
-        # Create .openhands/microagents directory
-        microagents_dir = root / ".openhands" / "microagents"
+        # Create .z8l-agent/microagents directory
+        microagents_dir = root / ".z8l-agent" / "microagents"
         microagents_dir.mkdir(parents=True)
 
         yield root, microagents_dir
@@ -88,7 +88,7 @@ def test_load_user_skills_with_agents_directory(temp_user_skills_dir):
 
 
 def test_load_user_skills_with_skills_directory(temp_user_skills_dir):
-    """Test load_user_skills loads from .openhands/skills directory."""
+    """Test load_user_skills loads from .z8l-agent/skills directory."""
     root, _, skills_dir = temp_user_skills_dir
 
     # Create a test skill file
@@ -140,10 +140,10 @@ def test_load_user_skills_with_microagents_directory(temp_microagents_dir):
 
 
 def test_load_user_skills_priority_order(tmp_path):
-    """Test precedence .agents/skills > .openhands/skills > microagents."""
+    """Test precedence .agents/skills > .z8l-agent/skills > microagents."""
     agents_dir = tmp_path / ".agents" / "skills"
-    skills_dir = tmp_path / ".openhands" / "skills"
-    microagents_dir = tmp_path / ".openhands" / "microagents"
+    skills_dir = tmp_path / ".z8l-agent" / "skills"
+    microagents_dir = tmp_path / ".z8l-agent" / "microagents"
     agents_dir.mkdir(parents=True)
     skills_dir.mkdir(parents=True)
     microagents_dir.mkdir(parents=True)
@@ -152,10 +152,10 @@ def test_load_user_skills_priority_order(tmp_path):
         "---\nname: duplicate\n---\nFrom .agents/skills."
     )
     (skills_dir / "duplicate.md").write_text(
-        "---\nname: duplicate\n---\nFrom .openhands/skills."
+        "---\nname: duplicate\n---\nFrom .z8l-agent/skills."
     )
     (microagents_dir / "duplicate.md").write_text(
-        "---\nname: duplicate\n---\nFrom .openhands/microagents."
+        "---\nname: duplicate\n---\nFrom .z8l-agent/microagents."
     )
 
     from openhands.sdk.skills import skill
@@ -172,12 +172,12 @@ def test_load_user_skills_priority_order(tmp_path):
 
 
 def test_load_user_skills_merges_all_directories(tmp_path):
-    """Test loading unique skills from .agents/skills, .openhands/skills,
+    """Test loading unique skills from .agents/skills, .z8l-agent/skills,
     microagents.
     """
     agents_dir = tmp_path / ".agents" / "skills"
-    skills_dir = tmp_path / ".openhands" / "skills"
-    microagents_dir = tmp_path / ".openhands" / "microagents"
+    skills_dir = tmp_path / ".z8l-agent" / "skills"
+    microagents_dir = tmp_path / ".z8l-agent" / "microagents"
     agents_dir.mkdir(parents=True)
     skills_dir.mkdir(parents=True)
     microagents_dir.mkdir(parents=True)

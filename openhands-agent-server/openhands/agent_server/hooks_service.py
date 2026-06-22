@@ -4,8 +4,8 @@ This module contains the business logic for loading hooks from the workspace,
 keeping the router clean and focused on HTTP concerns.
 
 Hook Sources:
-- Project hooks: {workspace}/.openhands/hooks.json
-- User hooks: ~/.openhands/hooks.json (future)
+- Project hooks: {workspace}/.z8l-agent/hooks.json
+- User hooks: ~/.z8l-agent/hooks.json (future)
 """
 
 from pathlib import Path
@@ -18,10 +18,10 @@ logger = get_logger(__name__)
 
 
 def load_hooks_from_workspace(project_dir: str | None = None) -> HookConfig | None:
-    """Load hooks from the workspace .openhands/hooks.json file.
+    """Load hooks from the workspace .z8l-agent/hooks.json file.
 
     This function reads the hooks configuration from the project's
-    .openhands/hooks.json file if it exists.
+    .z8l-agent/hooks.json file if it exists.
 
     Args:
         project_dir: Workspace directory path for project hooks.
@@ -33,7 +33,7 @@ def load_hooks_from_workspace(project_dir: str | None = None) -> HookConfig | No
         logger.debug("No project_dir provided, skipping hooks loading")
         return None
 
-    hooks_path = Path(project_dir) / ".openhands" / "hooks.json"
+    hooks_path = Path(project_dir) / ".z8l-agent" / "hooks.json"
 
     if not hooks_path.exists():
         logger.debug(f"No hooks.json found at {hooks_path}")

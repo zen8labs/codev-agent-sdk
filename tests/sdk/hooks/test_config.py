@@ -215,15 +215,15 @@ class TestHookConfig:
         assert config.is_empty()
 
     def test_load_discovers_config_in_working_dir(self):
-        """Test that load() discovers .openhands/hooks.json in working_dir."""
+        """Test that load() discovers .z8l-agent/hooks.json in working_dir."""
         hook = {"type": "command", "command": "test-hook.sh"}
         data = {"hooks": {"PreToolUse": [{"matcher": "*", "hooks": [hook]}]}}
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            # Create .openhands/hooks.json in the working directory
+            # Create .z8l-agent/hooks.json in the working directory
             import os
 
-            hooks_dir = os.path.join(tmpdir, ".openhands")
+            hooks_dir = os.path.join(tmpdir, ".z8l-agent")
             os.makedirs(hooks_dir)
             hooks_file = os.path.join(hooks_dir, "hooks.json")
             with open(hooks_file, "w") as f:
