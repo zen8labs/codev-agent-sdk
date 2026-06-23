@@ -1,13 +1,12 @@
 from __future__ import annotations
 
 import asyncio
-import contextlib
 import json
 import os
 import subprocess
 import time
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 from urllib.parse import quote
@@ -20,7 +19,6 @@ from openhands.sdk.agent.base import AgentBase
 from openhands.sdk.context.agent_context import AgentContext
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.event import (
-    ACPToolCallEvent,
     ActionEvent,
     MessageEvent,
     ObservationEvent,
@@ -80,39 +78,6 @@ def _extract_session_id(payload: Any) -> str | None:
     return None
 
 
-def _extract_text(payload: Any) -> str | None:
-    if isinstance(payload, str):
-        return payload
-    if not isinstance(payload, dict):
-        return None
-    for key in ("text", "delta", "content", "message"):
-        value = payload.get(key)
-        if isinstance(value, str):
-            return value
-    nested = payload.get("data")
-    if nested is not None:
-        return _extract_text(nested)
-    return None
-
-
-def _extract_session_ref(payload: Any) -> str | None:
-    if not isinstance(payload, dict):
-        return None
-    for key in ("session_id", "sessionId", "id"):
-        value = payload.get(key)
-        if isinstance(value, str) and value.strip():
-            return value.strip()
-    for key in ("session", "sessionID"):
-        value = payload.get(key)
-        if isinstance(value, dict):
-            session_id = _extract_session_ref(value)
-            if session_id:
-                return session_id
-        elif isinstance(value, str) and value.strip():
-            return value.strip()
-    return None
-
-
 class OpenCodeAgent(AgentBase):
     """Native REST/SSE OpenCode adapter."""
 
@@ -141,6 +106,14 @@ class OpenCodeAgent(AgentBase):
         gt=0,
         description="Timeout in seconds for a full OpenCode turn.",
     )
+    opencode_model: str | None = Field(
+        default=None,
+        description=(
+            "Model identifier for the OpenCode daemon (e.g. a free OpenCode Zen "
+            "model). The deploying application routes this into the daemon's "
+            "config via the ``OPENCODE_CONFIG_CONTENT`` env secret."
+        ),
+    )
 
     _executor: AsyncExecutor | None = PrivateAttr(default=None)
     _base_url: str | None = PrivateAttr(default=None)
@@ -148,6 +121,7 @@ class OpenCodeAgent(AgentBase):
     _closed: bool = PrivateAttr(default=False)
     _on_activity: Callable[[], None] | None = PrivateAttr(default=None)
     _last_activity_signal_at: float = PrivateAttr(default=0.0)
+    _subprocess_env: dict[str, str] | None = PrivateAttr(default=None)
 
     @property
     def supports_openhands_tools(self) -> bool:
@@ -184,9 +158,17 @@ class OpenCodeAgent(AgentBase):
     ) -> None:
         self._ensure_runtime()
         assert self._executor is not None
-        self._executor.run_async(self._ainit_state(state), timeout=self.opencode_prompt_timeout)
+        self._executor.run_async(
+            self._ainit_state(state), timeout=self.opencode_prompt_timeout
+        )
 
     async def _ainit_state(self, state: ConversationState) -> None:
+        # Resolve conversation secrets into env vars for the OpenCode daemon.
+        # The deploying application delivers model/provider routing via
+        # ``OPENCODE_CONFIG_CONTENT`` (and ``OPENCODE_API_KEY`` for Zen free
+        # models) as conversation secrets; the daemon reads them at startup.
+        self._subprocess_env = state.secret_registry.get_all_secrets_as_env_vars()
+
         base_url, auth_header = await self._ensure_server_ready()
         self._base_url = base_url
         self._auth_header = auth_header
@@ -247,31 +229,12 @@ class OpenCodeAgent(AgentBase):
             state.execution_status = ConversationExecutionStatus.FINISHED
             return
 
-        stream_text: list[str] = []
-        stream_reasoning: list[str] = []
-        pending_tools: dict[str, dict[str, Any]] = {}
-
+        self._signal_activity()
         try:
-            async with httpx.AsyncClient(timeout=self.opencode_prompt_timeout) as client:
-                stream_task = asyncio.create_task(
-                    self._stream_events(
-                        client,
-                        session_id,
-                        on_event,
-                        on_token,
-                        state,
-                        stream_text,
-                        stream_reasoning,
-                        pending_tools,
-                    )
-                )
-                try:
-                    await self._post_prompt(client, session_id, prompt_text)
-                    wait_payload = await self._wait_for_turn(client, session_id)
-                finally:
-                    stream_task.cancel()
-                    with contextlib.suppress(asyncio.CancelledError):
-                        await stream_task
+            async with httpx.AsyncClient(
+                timeout=self.opencode_prompt_timeout
+            ) as client:
+                response_data = await self._post_prompt(client, session_id, prompt_text)
         except Exception as exc:
             logger.error("OpenCode prompt failed: %s", exc, exc_info=True)
             on_event(
@@ -293,11 +256,91 @@ class OpenCodeAgent(AgentBase):
             state.execution_status = ConversationExecutionStatus.ERROR
             return
 
+        # Parse the response: {"info": {...}, "parts": [...]}
+        # The POST /session/{id}/message endpoint returns the complete
+        # assistant message with parts for step-start, reasoning, text,
+        # and step-finish.
         mask = state.secret_registry.mask_secrets_in_output
+        stream_text: list[str] = []
+        stream_reasoning: list[str] = []
+
+        # Check for model-level errors in the response info.
+        info = response_data.get("info", {}) if isinstance(response_data, dict) else {}
+        error_info = info.get("error") if isinstance(info, dict) else None
+        if isinstance(error_info, dict):
+            # OpenCode nests the human-readable message under
+            # ``data.message``; check top-level keys first, then nested.
+            error_msg = _first_string(error_info, "message", "error", "detail")
+            if not error_msg:
+                nested = error_info.get("data")
+                if isinstance(nested, dict):
+                    error_msg = _first_string(nested, "message", "error", "detail")
+            if not error_msg:
+                error_msg = str(error_info)
+            on_event(
+                MessageEvent(
+                    source="agent",
+                    llm_message=Message(
+                        role="assistant",
+                        content=[
+                            TextContent(text=f"OpenCode model error: {error_msg}")
+                        ],
+                    ),
+                )
+            )
+            on_event(
+                ConversationErrorEvent(
+                    source="agent",
+                    code="OpenCodeModelError",
+                    detail=error_msg[:500],
+                )
+            )
+            state.execution_status = ConversationExecutionStatus.ERROR
+            return
+
+        parts = (
+            response_data.get("parts", []) if isinstance(response_data, dict) else []
+        )
+        for part in parts:
+            if not isinstance(part, dict):
+                continue
+            part_type = part.get("type", "")
+            if part_type == "text":
+                text = mask(part.get("text", ""))
+                if text:
+                    stream_text.append(text)
+                    if on_token is not None:
+                        on_token(
+                            ModelResponseStream(
+                                choices=[
+                                    StreamingChoices(
+                                        index=0,
+                                        delta=Delta(content=text),
+                                    )
+                                ]
+                            )
+                        )
+            elif part_type == "reasoning":
+                text = mask(part.get("text", ""))
+                if text:
+                    stream_reasoning.append(text)
+                    if on_token is not None:
+                        on_token(
+                            ModelResponseStream(
+                                choices=[
+                                    StreamingChoices(
+                                        index=0,
+                                        delta=Delta(
+                                            content=None,
+                                            reasoning_content=text,
+                                        ),
+                                    )
+                                ]
+                            )
+                        )
+
         response_text = mask("".join(stream_text))
         reasoning_text = mask("".join(stream_reasoning))
-        if not response_text:
-            response_text = mask(_extract_text(wait_payload) or "")
         if not response_text:
             response_text = "(No response from OpenCode)"
 
@@ -318,9 +361,7 @@ class OpenCodeAgent(AgentBase):
             ),
             llm_response_id=str(uuid.uuid4()),
         )
-        on_event(
-            action_event
-        )
+        on_event(action_event)
         on_event(
             ObservationEvent(
                 observation=FinishObservation.from_text(text=finish_action.message),
@@ -404,8 +445,9 @@ class OpenCodeAgent(AgentBase):
         return False
 
     def _start_server(self) -> None:
-        command = self.opencode_start_command or ["opencode", "start"]
-        fallback = ["npx", "-y", "@opencode-ai/cli", "start"]
+        command = self.opencode_start_command or ["opencode", "serve"]
+        fallback = ["npx", "-y", "@opencode-ai/cli", "serve"]
+        env = {**os.environ, **(self._subprocess_env or {})}
         try:
             subprocess.Popen(
                 command,
@@ -413,6 +455,7 @@ class OpenCodeAgent(AgentBase):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                env=env,
             )
             logger.info("Started OpenCode daemon with %s", command)
         except FileNotFoundError:
@@ -422,6 +465,7 @@ class OpenCodeAgent(AgentBase):
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
                 start_new_session=True,
+                env=env,
             )
             logger.info("Started OpenCode daemon with %s", fallback)
 
@@ -443,7 +487,9 @@ class OpenCodeAgent(AgentBase):
                 if url.endswith("/api/session"):
                     body = {"directory": cwd}
                 try:
-                    response = await client.request(method, url, headers=headers, json=body)
+                    response = await client.request(
+                        method, url, headers=headers, json=body
+                    )
                     response.raise_for_status()
                     session_id = _extract_session_id(response.json())
                     if session_id:
@@ -457,191 +503,17 @@ class OpenCodeAgent(AgentBase):
     ) -> Any:
         assert self._base_url is not None
         headers = self._headers(self._auth_header)
-        payload = {"prompt": [{"type": "text", "text": prompt_text}]}
-        endpoints = [
-            f"{self._base_url}/api/session/{session_id}/prompt",
-            f"{self._base_url}/session/{session_id}/prompt",
-        ]
-        for url in endpoints:
-            try:
-                response = await client.post(url, headers=headers, json=payload)
-                response.raise_for_status()
-                return response.json() if response.content else {}
-            except httpx.HTTPError:
-                continue
-        raise RuntimeError("Failed to send prompt to OpenCode")
-
-    async def _wait_for_turn(self, client: httpx.AsyncClient, session_id: str) -> Any:
-        assert self._base_url is not None
-        headers = self._headers(self._auth_header)
-        endpoints = [
-            f"{self._base_url}/api/session/{session_id}/wait",
-            f"{self._base_url}/session/{session_id}/wait",
-        ]
-        for url in endpoints:
-            try:
-                response = await client.post(url, headers=headers, json={})
-                response.raise_for_status()
-                return response.json() if response.content else {}
-            except httpx.HTTPError:
-                continue
-        return {}
-
-    async def _stream_events(
-        self,
-        client: httpx.AsyncClient,
-        session_id: str,
-        on_event: ConversationCallbackType,
-        on_token: ConversationTokenCallbackType | None,
-        state: ConversationState,
-        stream_text: list[str],
-        stream_reasoning: list[str],
-        pending_tools: dict[str, dict[str, Any]],
-    ) -> None:
-        assert self._base_url is not None
-        headers = self._headers(self._auth_header)
-        endpoints = [f"{self._base_url}/api/event", f"{self._base_url}/event"]
-        for url in endpoints:
-            try:
-                async with client.stream("GET", url, headers=headers) as response:
-                    response.raise_for_status()
-                    async for event_name, data in self._iter_sse(response):
-                        if self._extract_event_session_id(data) not in (None, session_id):
-                            continue
-                        self._handle_stream_event(
-                            event_name,
-                            data,
-                            on_event,
-                            on_token,
-                            state,
-                            stream_text,
-                            stream_reasoning,
-                            pending_tools,
-                        )
-                return
-            except httpx.HTTPError:
-                continue
-
-    async def _iter_sse(
-        self, response: httpx.Response
-    ) -> AsyncIterator[tuple[str | None, Any]]:
-        event_name: str | None = None
-        data_lines: list[str] = []
-        async for raw_line in response.aiter_lines():
-            if raw_line == "":
-                if data_lines:
-                    payload = "\n".join(data_lines)
-                    try:
-                        data = json.loads(payload)
-                    except json.JSONDecodeError:
-                        data = payload
-                    yield event_name, data
-                event_name = None
-                data_lines = []
-                continue
-            if raw_line.startswith(":"):
-                continue
-            if raw_line.startswith("event:"):
-                event_name = raw_line.split(":", 1)[1].strip()
-                continue
-            if raw_line.startswith("data:"):
-                data_lines.append(raw_line.split(":", 1)[1].lstrip())
-
-    def _handle_stream_event(
-        self,
-        event_name: str | None,
-        data: Any,
-        on_event: ConversationCallbackType,
-        on_token: ConversationTokenCallbackType | None,
-        state: ConversationState,
-        stream_text: list[str],
-        stream_reasoning: list[str],
-        pending_tools: dict[str, dict[str, Any]],
-    ) -> None:
-        self._signal_activity()
-        event_name = event_name or ""
-        mask = state.secret_registry.mask_secrets_in_output
-
-        if event_name == "session.next.text.delta":
-            text = mask(_extract_text(data) or "")
-            if text:
-                stream_text.append(text)
-                if on_token is not None:
-                    on_token(text)
-            return
-
-        if event_name == "session.next.reasoning.delta":
-            text = mask(_extract_text(data) or "")
-            if text:
-                stream_reasoning.append(text)
-                if on_token is not None:
-                    on_token(
-                        ModelResponseStream(
-                            choices=[
-                                StreamingChoices(
-                                    index=0,
-                                    delta=Delta(content=None, reasoning_content=text),
-                                )
-                            ]
-                        )
-                    )
-            return
-
-        if event_name in {
-            "session.next.tool.called",
-            "session.next.tool.progress",
-            "session.next.tool.success",
-            "session.next.tool.failed",
-        }:
-            event = self._tool_event_from_payload(event_name, data, pending_tools)
-            if event is not None:
-                on_event(event)
-
-    def _tool_event_from_payload(
-        self,
-        event_name: str,
-        data: Any,
-        pending_tools: dict[str, dict[str, Any]],
-    ) -> ACPToolCallEvent | None:
-        payload = data if isinstance(data, dict) else {}
-        call_id = _first_string(payload, "tool_call_id", "toolCallId", "callID", "id")
-        if not call_id:
-            return None
-        current = dict(pending_tools.get(call_id, {}))
-        current.update(payload)
-        pending_tools[call_id] = current
-
-        status_map = {
-            "session.next.tool.called": "pending",
-            "session.next.tool.progress": "in_progress",
-            "session.next.tool.success": "completed",
-            "session.next.tool.failed": "failed",
-        }
-        status = status_map[event_name]
-        title = _first_string(current, "title", "tool", "name") or "tool"
-        raw_input = current.get("input") or current.get("raw_input") or current.get("rawInput")
-        raw_output = current.get("output") or current.get("raw_output") or current.get("rawOutput")
-        content = current.get("content")
-        return ACPToolCallEvent(
-            tool_call_id=call_id,
-            title=title,
-            status=status,
-            tool_kind=_first_string(current, "tool_kind", "toolKind", "tool", "name"),
-            raw_input=raw_input,
-            raw_output=raw_output,
-            content=content if isinstance(content, list) else None,
-            is_error=status == "failed",
-        )
-
-    def _extract_event_session_id(self, data: Any) -> str | None:
-        if not isinstance(data, dict):
-            return None
-        for key in ("session", "payload", "data"):
-            nested = data.get(key)
-            session_id = _extract_session_ref(nested)
-            if session_id:
-                return session_id
-        return _extract_session_ref(data)
+        # The OpenCode v1/v2 API accepts a parts array on the
+        # /session/{id}/message endpoint, which blocks until the model
+        # finishes and returns the complete assistant message.
+        payload = {"parts": [{"type": "text", "text": prompt_text}]}
+        url = f"{self._base_url}/session/{session_id}/message"
+        response = await client.post(url, headers=headers, json=payload)
+        response.raise_for_status()
+        try:
+            return response.json() if response.content else {}
+        except Exception:
+            return {}
 
     def _latest_user_prompt(self, state: ConversationState) -> str:
         last_id = state.last_user_message_id

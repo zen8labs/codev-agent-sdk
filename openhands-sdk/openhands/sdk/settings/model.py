@@ -1740,7 +1740,7 @@ class OpenCodeAgentSettings(AgentSettingsBase):
                 key="opencode",
                 label="OpenCode",
                 variant="opencode",
-            ).model_dump()
+            ).model_dump(),
         },
     )
     opencode_state_dir: str | None = Field(
@@ -1755,7 +1755,7 @@ class OpenCodeAgentSettings(AgentSettingsBase):
                 key="opencode",
                 label="OpenCode",
                 variant="opencode",
-            ).model_dump()
+            ).model_dump(),
         },
     )
     opencode_start_command: list[str] = Field(
@@ -1770,7 +1770,27 @@ class OpenCodeAgentSettings(AgentSettingsBase):
                 key="opencode",
                 label="OpenCode",
                 variant="opencode",
-            ).model_dump()
+            ).model_dump(),
+        },
+    )
+    opencode_model: str | None = Field(
+        default=None,
+        description=(
+            "Model identifier for the OpenCode daemon to use (e.g. a free "
+            "OpenCode Zen model like ``minimax-m3-free``). Routed to the "
+            "daemon via ``OPENCODE_CONFIG_CONTENT``; leave blank to let the "
+            "daemon pick its own default."
+        ),
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode model",
+                prominence=SettingProminence.CRITICAL,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
         },
     )
     opencode_prompt_timeout: float = Field(
@@ -1786,7 +1806,7 @@ class OpenCodeAgentSettings(AgentSettingsBase):
                 key="opencode",
                 label="OpenCode",
                 variant="opencode",
-            ).model_dump()
+            ).model_dump(),
         },
     )
 
@@ -1800,6 +1820,7 @@ class OpenCodeAgentSettings(AgentSettingsBase):
             opencode_state_dir=self.opencode_state_dir,
             opencode_start_command=list(self.opencode_start_command),
             opencode_prompt_timeout=self.opencode_prompt_timeout,
+            opencode_model=self.opencode_model,
         )
 
 
@@ -1870,10 +1891,7 @@ variant.
 
 
 _AGENT_SETTINGS_ADAPTER: TypeAdapter[
-    OpenHandsAgentSettings
-    | LLMAgentSettings
-    | ACPAgentSettings
-    | OpenCodeAgentSettings
+    OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings
 ] = TypeAdapter(AgentSettingsConfig)
 
 
@@ -1882,10 +1900,7 @@ def validate_agent_settings(
     *,
     context: Mapping[str, Any] | None = None,
 ) -> (
-    OpenHandsAgentSettings
-    | LLMAgentSettings
-    | ACPAgentSettings
-    | OpenCodeAgentSettings
+    OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings
 ):
     """Load and validate an agent-settings payload.
 
