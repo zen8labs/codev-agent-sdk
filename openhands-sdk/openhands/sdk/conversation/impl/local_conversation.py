@@ -822,7 +822,7 @@ class LocalConversation(BaseConversation):
         subprocess. Deferring that work to run() keeps send_message() fast and
         avoids HTTP client read timeouts on the remote conversation endpoint.
         """
-        return not isinstance(self.agent, ACPAgent)
+        return self.agent.initialize_on_send_message
 
     def _pin_prompt_cache_key(self) -> None:
         # Pin the OpenAI prefix-cache shard to this conversation (#2904, #2918).

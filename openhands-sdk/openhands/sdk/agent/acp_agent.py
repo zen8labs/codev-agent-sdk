@@ -1719,6 +1719,18 @@ class ACPAgent(AgentBase):
         """ACP agents have ``agent_kind == "acp"``."""
         return "acp"
 
+    @property
+    def emits_native_stream_tokens(self) -> bool:
+        return True
+
+    @property
+    def initialize_on_send_message(self) -> bool:
+        return False
+
+    @property
+    def supports_activity_heartbeat(self) -> bool:
+        return True
+
     # -- ACP-specific runtime properties -----------------------------------
 
     @property

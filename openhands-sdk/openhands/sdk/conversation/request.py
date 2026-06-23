@@ -16,6 +16,7 @@ from pydantic import BaseModel, Discriminator, Field, Tag, model_validator
 from openhands.sdk.agent.acp_agent import ACPAgent as ACPAgent
 from openhands.sdk.agent.agent import Agent as Agent
 from openhands.sdk.agent.base import AgentBase
+from openhands.sdk.agent.opencode_agent import OpenCodeAgent as OpenCodeAgent
 from openhands.sdk.conversation.types import ConversationTags
 from openhands.sdk.hooks import HookConfig
 from openhands.sdk.llm.message import ImageContent, Message, TextContent
@@ -37,10 +38,12 @@ from openhands.sdk.workspace import LocalWorkspace
 # ---------------------------------------------------------------------------
 
 ACPEnabledAgent = Annotated[
-    Annotated[Agent, Tag("Agent")] | Annotated[ACPAgent, Tag("ACPAgent")],
+    Annotated[Agent, Tag("Agent")]
+    | Annotated[ACPAgent, Tag("ACPAgent")]
+    | Annotated[OpenCodeAgent, Tag("OpenCodeAgent")],
     Discriminator(kind_of),
 ]
-"""Discriminated union: either a regular Agent or an ACP-capable Agent."""
+"""Discriminated union for the supported concrete agent payloads."""
 
 
 # ---------------------------------------------------------------------------

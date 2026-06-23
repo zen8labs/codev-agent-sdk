@@ -819,9 +819,24 @@ class AgentBase(DiscriminatedUnionMixin, ABC):
         return True
 
     @property
-    def agent_kind(self) -> Literal["openhands", "acp"]:
+    def agent_kind(self) -> Literal["openhands", "acp", "opencode"]:
         """Agent kind, matching the ``agent_kind`` settings discriminator."""
         return "openhands"
+
+    @property
+    def emits_native_stream_tokens(self) -> bool:
+        """``True`` when the agent streams token-like deltas without using ``LLM``."""
+        return False
+
+    @property
+    def initialize_on_send_message(self) -> bool:
+        """Whether ``send_message()`` should eagerly initialize this agent."""
+        return True
+
+    @property
+    def supports_activity_heartbeat(self) -> bool:
+        """``True`` when the agent can signal background prompt activity."""
+        return False
 
     def ask_agent(self, question: str) -> str | None:  # noqa: ARG002
         """Optional override for stateless question answering.

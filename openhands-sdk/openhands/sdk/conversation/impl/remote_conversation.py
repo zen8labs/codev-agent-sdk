@@ -75,6 +75,10 @@ def _validate_remote_agent(agent_data: dict) -> AgentBase:
         from openhands.sdk.agent.acp_agent import ACPAgent
 
         return ACPAgent.model_validate(agent_data)
+    if agent_data.get("kind") == "OpenCodeAgent":
+        from openhands.sdk.agent.opencode_agent import OpenCodeAgent
+
+        return OpenCodeAgent.model_validate(agent_data)
     return AgentBase.model_validate(agent_data)
 
 
