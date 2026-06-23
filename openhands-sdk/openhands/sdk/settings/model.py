@@ -2005,12 +2005,13 @@ def apply_agent_settings_diff(
     return validate_agent_settings(merged, context=context)
 
 
-def default_agent_settings() -> OpenCodeAgentSettings:
-    """Return a default :class:`OpenCodeAgentSettings` instance.
+def default_agent_settings() -> OpenHandsAgentSettings:
+    """Return a default :class:`OpenHandsAgentSettings` instance.
 
-    This is the default variant for a fresh start.
+    This is the drop-in replacement for the old bare ``AgentSettings()``
+    constructor call — the default-ever-since variant is the OpenHands agent.
     """
-    return OpenCodeAgentSettings()
+    return OpenHandsAgentSettings()
 
 
 def create_agent_from_settings(

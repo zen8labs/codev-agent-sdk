@@ -14,8 +14,8 @@ from openhands.sdk import (
     AgentContext,
     AgentSettingsBase,
     ConversationSettings,
-    OpenHandsAgentSettings,
     OpenCodeAgentSettings,
+    OpenHandsAgentSettings,
     SettingProminence,
     Tool,
     default_agent_settings,
@@ -377,10 +377,10 @@ def test_export_agent_settings_schema_emits_variant_tagged_sections() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_default_agent_settings_returns_opencode_variant() -> None:
+def test_default_agent_settings_returns_openhands_variant() -> None:
     s = default_agent_settings()
-    assert isinstance(s, OpenCodeAgentSettings)
-    assert s.agent_kind == "opencode"
+    assert isinstance(s, OpenHandsAgentSettings)
+    assert s.agent_kind == "openhands"
 
 
 def test_validate_agent_settings_defaults_to_openhands_when_discriminator_missing() -> (

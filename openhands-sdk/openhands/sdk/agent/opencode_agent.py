@@ -429,6 +429,15 @@ class OpenCodeAgent(AgentBase):
                 base_url, auth_header = self._load_server_credentials()
                 if base_url and await self._ping(base_url, auth_header):
                     return base_url, auth_header
+                # If base_url is None (no server.json yet and no
+                # opencode_http_base override), try extracting a port from
+                # the start command and pinging it directly.  This covers
+                # the fresh-daemon race where server.json hasn't been
+                # written yet.
+                if base_url is None and self.opencode_start_command:
+                    fallback_url = self._try_port_from_command()
+                    if fallback_url and await self._ping(fallback_url, auth_header):
+                        return fallback_url, auth_header
             except Exception as exc:
                 last_error = exc
             await asyncio.sleep(0.5)
@@ -476,13 +485,26 @@ class OpenCodeAgent(AgentBase):
             base_url = base_url.rstrip("/")
         return base_url, auth_header
 
+    def _try_port_from_command(self) -> str | None:
+        """Extract a ``--port`` value from the start command, if present."""
+        for i, arg in enumerate(self.opencode_start_command):
+            if arg == "--port" and i + 1 < len(self.opencode_start_command):
+                port_str = self.opencode_start_command[i + 1]
+                if port_str.isdigit():
+                    return f"http://127.0.0.1:{port_str}"
+        return None
+
     async def _ping(self, base_url: str, auth_header: str | None) -> bool:
         headers = self._headers(auth_header)
         async with httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT) as client:
-            for path in ("/health", "/api/health", "/"):
+            for path, min_status, max_status in (
+                ("/health", 200, 299),
+                ("/api/health", 200, 299),
+                ("/", 200, 499),
+            ):
                 try:
                     response = await client.get(f"{base_url}{path}", headers=headers)
-                    if response.status_code < 500:
+                    if min_status <= response.status_code <= max_status:
                         return True
                 except httpx.HTTPError:
                     continue
