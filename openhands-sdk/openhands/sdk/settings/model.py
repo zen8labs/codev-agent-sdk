@@ -1793,6 +1793,26 @@ class OpenCodeAgentSettings(AgentSettingsBase):
             ).model_dump(),
         },
     )
+    opencode_use_llm_profile: bool = Field(
+        default=True,
+        description=(
+            "When True (default), route the OpenCode daemon through the "
+            "user's active LLM profile (from LLM Settings) via "
+            "``OPENCODE_CONFIG_CONTENT``. When False, use the OpenCode Zen "
+            "gateway with the model selected in ``opencode_model``."
+        ),
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="Use LLM profile model",
+                prominence=SettingProminence.CRITICAL,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
     opencode_prompt_timeout: float = Field(
         default=float(os.environ.get("OPENCODE_PROMPT_TIMEOUT", "1800")),
         gt=0,
@@ -1821,6 +1841,7 @@ class OpenCodeAgentSettings(AgentSettingsBase):
             opencode_start_command=list(self.opencode_start_command),
             opencode_prompt_timeout=self.opencode_prompt_timeout,
             opencode_model=self.opencode_model,
+            opencode_use_llm_profile=self.opencode_use_llm_profile,
         )
 
 

@@ -114,6 +114,15 @@ class OpenCodeAgent(AgentBase):
             "config via the ``OPENCODE_CONFIG_CONTENT`` env secret."
         ),
     )
+    opencode_use_llm_profile: bool = Field(
+        default=True,
+        description=(
+            "When True, the deploying app should route the daemon through the "
+            "user's active LLM profile. When False, use the OpenCode Zen gateway "
+            "with ``opencode_model``. This field is read by the app-server "
+            "builder, not the agent itself."
+        ),
+    )
 
     _executor: AsyncExecutor | None = PrivateAttr(default=None)
     _base_url: str | None = PrivateAttr(default=None)
