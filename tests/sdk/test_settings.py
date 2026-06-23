@@ -14,6 +14,7 @@ from openhands.sdk import (
     AgentContext,
     AgentSettingsBase,
     ConversationSettings,
+    OpenCodeAgentSettings,
     OpenHandsAgentSettings,
     SettingProminence,
     Tool,
@@ -365,8 +366,10 @@ def test_export_agent_settings_schema_emits_variant_tagged_sections() -> None:
     command_field = next(f for f in acp_section.fields if f.key == "acp_command")
     assert command_field.prominence is SettingProminence.MINOR
 
-    # ACP variant also has an LLM section (for cost/pricing attribution).
+    # ACP and OpenCode variants also have an LLM section (for cost/pricing attribution).
     assert ("llm", "acp") in by_keyvariant
+    assert ("llm", "opencode") in by_keyvariant
+    assert ("opencode", "opencode") in by_keyvariant
 
 
 # ---------------------------------------------------------------------------
@@ -412,6 +415,10 @@ def test_validate_agent_settings_dispatches_on_agent_kind() -> None:
     )
     assert isinstance(acp, ACPAgentSettings)
     assert acp.acp_command == ["npx", "-y", "claude-agent-acp"]
+
+    opencode = validate_agent_settings({"agent_kind": "opencode"})
+    assert isinstance(opencode, OpenCodeAgentSettings)
+    assert opencode.agent_kind == "opencode"
 
 
 def test_validate_agent_settings_migrates_v0_llm_payload() -> None:

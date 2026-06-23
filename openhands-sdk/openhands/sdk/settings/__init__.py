@@ -43,6 +43,7 @@ if TYPE_CHECKING:
         LLMSummarizingCondenserSettings,
         NoOpCondenserSettings,
         OpenHandsAgentSettings,
+        OpenCodeAgentSettings,
         SettingsChoice,
         SettingsFieldSchema,
         SettingsSchema,
@@ -69,6 +70,7 @@ _MODEL_EXPORTS = {
     "LLMSummarizingCondenserSettings",
     "NoOpCondenserSettings",
     "OpenHandsAgentSettings",
+    "OpenCodeAgentSettings",
     "SettingsChoice",
     "SettingsFieldSchema",
     "SettingsSchema",
@@ -101,6 +103,7 @@ __all__ = [
     "LLMSummarizingCondenserSettings",
     "NoOpCondenserSettings",
     "OpenHandsAgentSettings",
+    "OpenCodeAgentSettings",
     "SETTINGS_METADATA_KEY",
     "SETTINGS_SECTION_METADATA_KEY",
     # API models for settings endpoints

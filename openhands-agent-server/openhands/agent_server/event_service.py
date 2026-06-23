@@ -616,9 +616,7 @@ class EventService:
         callback that resets the idle timer whenever the ACP bridge receives
         a streaming update (throttled to every 30 s by the bridge).
         """
-        from openhands.sdk.agent import ACPAgent
-
-        if isinstance(agent, ACPAgent):
+        if agent.supports_activity_heartbeat:
             from openhands.agent_server.server_details_router import (
                 update_last_execution_time,
             )
@@ -720,7 +718,7 @@ class EventService:
         # Only wire token streaming for agents that can actually emit token
         # callbacks. SDK LLM agents need stream=True, while ACP agents emit
         # AgentMessageChunk text through their bridge without exposing an LLM.
-        streaming_enabled = isinstance(agent, ACPAgent) or any(
+        streaming_enabled = agent.emits_native_stream_tokens or any(
             llm.stream for llm in agent.get_all_llms()
         )
         logger.debug(

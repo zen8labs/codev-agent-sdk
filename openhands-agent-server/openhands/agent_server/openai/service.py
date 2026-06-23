@@ -38,7 +38,11 @@ from openhands.sdk.conversation.state import (
 )
 from openhands.sdk.llm.llm_profile_store import LLMProfileStore
 from openhands.sdk.llm.message import ImageContent, TextContent
-from openhands.sdk.settings import ACPAgentSettings, OpenHandsAgentSettings
+from openhands.sdk.settings import (
+    ACPAgentSettings,
+    OpenHandsAgentSettings,
+    OpenCodeAgentSettings,
+)
 from openhands.sdk.workspace import LocalWorkspace
 
 
@@ -88,10 +92,10 @@ def _append_system_suffix(existing: str | None, system_text: str) -> str:
 
 
 def _with_profile_llm_and_system_text(
-    agent_settings: OpenHandsAgentSettings | ACPAgentSettings,
+    agent_settings: OpenHandsAgentSettings | ACPAgentSettings | OpenCodeAgentSettings,
     llm: LLM,
     system_text: str,
-) -> OpenHandsAgentSettings | ACPAgentSettings:
+) -> OpenHandsAgentSettings | ACPAgentSettings | OpenCodeAgentSettings:
     updated = agent_settings.model_copy(update={"llm": llm})
     if not system_text:
         return updated

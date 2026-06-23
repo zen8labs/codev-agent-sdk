@@ -29,7 +29,11 @@ if TYPE_CHECKING:
     from openhands.sdk.llm.llm import LLM
     from openhands.sdk.secret import LookupSecret
     from openhands.sdk.settings import OpenHandsAgentSettings
-    from openhands.sdk.settings.model import ACPAgentSettings, LLMAgentSettings
+    from openhands.sdk.settings.model import (
+        ACPAgentSettings,
+        LLMAgentSettings,
+        OpenCodeAgentSettings,
+    )
     from openhands.sdk.skills import Skill
 
 
@@ -340,7 +344,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
 
     def _fetch_agent_settings(
         self,
-    ) -> "OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings":
+    ) -> "OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings":
         """Call ``GET /api/settings`` and return a validated settings model.
 
         Uses ``X-Expose-Secrets: plaintext`` so secret fields (e.g. LLM

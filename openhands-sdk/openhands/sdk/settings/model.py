@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import copy
 import itertools
+import os
 import shutil
 from collections.abc import Callable, Mapping, Sequence
 from enum import Enum
@@ -74,7 +75,7 @@ from .metadata import (
 
 
 if TYPE_CHECKING:
-    from openhands.sdk.agent import ACPAgent, Agent
+    from openhands.sdk.agent import ACPAgent, Agent, OpenCodeAgent
     from openhands.sdk.agent.base import AgentBase
     from openhands.sdk.context.condenser import CondenserBase, LLMSummarizingCondenser
     from openhands.sdk.critic.base import CriticBase
@@ -924,7 +925,7 @@ class ConversationSettings(BaseModel):
         return request_type(**self._start_request_kwargs(**kwargs))
 
 
-AgentKind = Literal["openhands", "llm", "acp"]
+AgentKind = Literal["openhands", "llm", "acp", "opencode"]
 
 ACPServerKind = Literal["claude-code", "codex", "gemini-cli", "opencode", "custom"]
 """Known ACP backend servers the GUI can pick from.
@@ -1699,6 +1700,151 @@ class ACPAgentSettings(AgentSettingsBase):
         )
 
 
+class OpenCodeAgentSettings(AgentSettingsBase):
+    """Settings for the native OpenCode REST/SSE agent."""
+
+    agent_kind: Literal["opencode"] = Field(
+        default="opencode",
+        description=(
+            "Discriminator for the ``AgentSettings`` union. ``'opencode'`` selects "
+            "the native OpenCode REST/SSE adapter."
+        ),
+    )
+    llm: LLM = Field(
+        default_factory=_default_llm_settings,
+        description=(
+            "LLM identity used for cost/token attribution. The OpenCode daemon "
+            "makes its own model calls; this field remains for bookkeeping."
+        ),
+        json_schema_extra={
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="llm",
+                label="LLM (for metrics)",
+                variant="opencode",
+            ).model_dump()
+        },
+    )
+    agent_context: AgentContext | None = Field(
+        default=None,
+        description="Prompt-only context for the OpenCode daemon.",
+    )
+    opencode_http_base: str | None = Field(
+        default=None,
+        description="Optional override for the OpenCode daemon HTTP base URL.",
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode HTTP base URL",
+                prominence=SettingProminence.MINOR,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+    opencode_state_dir: str | None = Field(
+        default=None,
+        description="Optional override for the OpenCode daemon state directory.",
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode state directory",
+                prominence=SettingProminence.MINOR,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+    opencode_start_command: list[str] = Field(
+        default_factory=list,
+        description="Optional explicit command used to start the OpenCode daemon.",
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode start command",
+                prominence=SettingProminence.MINOR,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+    opencode_model: str | None = Field(
+        default=None,
+        description=(
+            "Model identifier for the OpenCode daemon to use (e.g. a free "
+            "OpenCode Zen model like ``minimax-m3-free``). Routed to the "
+            "daemon via ``OPENCODE_CONFIG_CONTENT``; leave blank to let the "
+            "daemon pick its own default."
+        ),
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode model",
+                prominence=SettingProminence.CRITICAL,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+    opencode_use_llm_profile: bool = Field(
+        default=True,
+        description=(
+            "When True (default), route the OpenCode daemon through the "
+            "user's active LLM profile (from LLM Settings) via "
+            "``OPENCODE_CONFIG_CONTENT``. When False, use the OpenCode Zen "
+            "gateway with the model selected in ``opencode_model``."
+        ),
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="Use LLM profile model",
+                prominence=SettingProminence.CRITICAL,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+    opencode_prompt_timeout: float = Field(
+        default=float(os.environ.get("OPENCODE_PROMPT_TIMEOUT", "1800")),
+        gt=0,
+        description="Inactivity timeout in seconds for a native OpenCode turn.",
+        json_schema_extra={
+            SETTINGS_METADATA_KEY: SettingsFieldMetadata(
+                label="OpenCode prompt inactivity timeout (seconds)",
+                prominence=SettingProminence.MINOR,
+            ).model_dump(),
+            SETTINGS_SECTION_METADATA_KEY: SettingsSectionMetadata(
+                key="opencode",
+                label="OpenCode",
+                variant="opencode",
+            ).model_dump(),
+        },
+    )
+
+    def create_agent(self) -> OpenCodeAgent:
+        from openhands.sdk.agent import OpenCodeAgent
+
+        return OpenCodeAgent(
+            llm=self.llm,
+            agent_context=self.agent_context,
+            opencode_http_base=self.opencode_http_base,
+            opencode_state_dir=self.opencode_state_dir,
+            opencode_start_command=list(self.opencode_start_command),
+            opencode_prompt_timeout=self.opencode_prompt_timeout,
+            opencode_model=self.opencode_model,
+            opencode_use_llm_profile=self.opencode_use_llm_profile,
+        )
+
+
 class LLMAgentSettings(OpenHandsAgentSettings):
     """Legacy ``agent_kind='llm'`` variant of :class:`OpenHandsAgentSettings`.
 
@@ -1748,7 +1894,8 @@ def _agent_settings_discriminator(value: Any) -> str:
 AgentSettingsConfig = Annotated[
     Annotated[OpenHandsAgentSettings, Tag("openhands")]
     | Annotated[LLMAgentSettings, Tag("llm")]
-    | Annotated[ACPAgentSettings, Tag("acp")],
+    | Annotated[ACPAgentSettings, Tag("acp")]
+    | Annotated[OpenCodeAgentSettings, Tag("opencode")],
     Discriminator(_agent_settings_discriminator),
 ]
 """Discriminated union over the agent-settings variants.
@@ -1765,7 +1912,7 @@ variant.
 
 
 _AGENT_SETTINGS_ADAPTER: TypeAdapter[
-    OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings
+    OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings
 ] = TypeAdapter(AgentSettingsConfig)
 
 
@@ -1773,14 +1920,18 @@ def validate_agent_settings(
     data: Any,
     *,
     context: Mapping[str, Any] | None = None,
-) -> OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings:
+) -> (
+    OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings
+):
     """Load and validate an agent-settings payload.
 
     Persisted payloads are migrated to the current schema version before
     validation, including legacy ``agent_kind: "llm"`` payloads from before the
     ``OpenHandsAgentSettings`` rename.
     """
-    if isinstance(data, OpenHandsAgentSettings | ACPAgentSettings):
+    if isinstance(
+        data, OpenHandsAgentSettings | ACPAgentSettings | OpenCodeAgentSettings
+    ):
         return data
     payload = _apply_persisted_migrations(
         data,
@@ -1821,7 +1972,7 @@ def apply_agent_settings_diff(
     diff: Mapping[str, Any] | None,
     *,
     context: Mapping[str, Any] | None = None,
-) -> OpenHandsAgentSettings | ACPAgentSettings:
+) -> OpenHandsAgentSettings | ACPAgentSettings | OpenCodeAgentSettings:
     """Apply a sparse agent-settings diff to a base, narrowing on ``agent_kind``.
 
     ``agent_kind`` is a one-way narrowing gate, never a conversion knob:
@@ -1858,18 +2009,17 @@ def default_agent_settings() -> OpenHandsAgentSettings:
     """Return a default :class:`OpenHandsAgentSettings` instance.
 
     This is the drop-in replacement for the old bare ``AgentSettings()``
-    constructor call — the default-ever-since variant is the LLM agent.
+    constructor call — the default-ever-since variant is the OpenHands agent.
     """
     return OpenHandsAgentSettings()
 
 
 def create_agent_from_settings(
-    settings: OpenHandsAgentSettings | ACPAgentSettings,
+    settings: OpenHandsAgentSettings | ACPAgentSettings | OpenCodeAgentSettings,
 ) -> AgentBase:
     """Dispatch to the variant's ``create_agent()`` method.
 
-    Returns either :class:`~openhands.sdk.agent.Agent` (LLM variant) or
-    :class:`~openhands.sdk.agent.ACPAgent` (ACP variant).
+    Returns the concrete agent for the selected settings variant.
     """
     return settings.create_agent()
 
@@ -1887,6 +2037,7 @@ def export_agent_settings_schema() -> SettingsSchema:
     """
     llm_schema = OpenHandsAgentSettings.export_schema()
     acp_schema = ACPAgentSettings.export_schema()
+    opencode_schema = OpenCodeAgentSettings.export_schema()
 
     merged_sections: list[SettingsSectionSchema] = []
     merged_by_key: dict[tuple[str, str | None], SettingsSectionSchema] = {}
@@ -1914,6 +2065,7 @@ def export_agent_settings_schema() -> SettingsSchema:
 
     _merge(llm_schema, default_variant="openhands")
     _merge(acp_schema, default_variant="acp")
+    _merge(opencode_schema, default_variant="opencode")
 
     return SettingsSchema(model_name="AgentSettings", sections=merged_sections)
 

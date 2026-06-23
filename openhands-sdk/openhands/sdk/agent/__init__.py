@@ -8,6 +8,7 @@ from openhands.sdk.agent.base import AgentBase
 
 if TYPE_CHECKING:
     from openhands.sdk.agent.acp_agent import ACPAgent
+    from openhands.sdk.agent.opencode_agent import OpenCodeAgent
 
 
 # Lazy import: eagerly importing ACPAgent registers it in the
@@ -18,6 +19,10 @@ def __getattr__(name: str):
         from openhands.sdk.agent.acp_agent import ACPAgent
 
         return ACPAgent
+    if name == "OpenCodeAgent":
+        from openhands.sdk.agent.opencode_agent import OpenCodeAgent
+
+        return OpenCodeAgent
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
@@ -25,4 +30,5 @@ __all__ = [
     "Agent",
     "AgentBase",
     "ACPAgent",
+    "OpenCodeAgent",
 ]
