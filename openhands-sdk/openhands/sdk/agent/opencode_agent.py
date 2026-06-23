@@ -5,6 +5,8 @@ import json
 import os
 import subprocess
 import time
+import urllib.error
+import urllib.request
 import uuid
 from collections.abc import Callable
 from pathlib import Path
@@ -19,6 +21,7 @@ from openhands.sdk.agent.base import AgentBase
 from openhands.sdk.context.agent_context import AgentContext
 from openhands.sdk.conversation.state import ConversationExecutionStatus
 from openhands.sdk.event import (
+    ACPToolCallEvent,
     ActionEvent,
     MessageEvent,
     ObservationEvent,
@@ -28,6 +31,7 @@ from openhands.sdk.llm import LLM, Message, MessageToolCall, TextContent
 from openhands.sdk.logger import get_logger
 from openhands.sdk.observability.laminar import maybe_init_laminar, observe
 from openhands.sdk.tool.builtins.finish import FinishAction, FinishObservation
+from openhands.sdk.utils import maybe_truncate
 from openhands.sdk.utils.async_executor import AsyncExecutor
 
 
@@ -46,6 +50,7 @@ maybe_init_laminar()
 _DEFAULT_PROMPT_TIMEOUT = float(os.environ.get("OPENCODE_PROMPT_TIMEOUT", "1800"))
 _DEFAULT_HTTP_TIMEOUT = float(os.environ.get("OPENCODE_HTTP_TIMEOUT", "30"))
 _ACTIVITY_SIGNAL_INTERVAL = 30.0
+_MAX_TOOL_CONTENT_CHARS = 30_000
 
 
 def _state_dir_from_env() -> Path:
@@ -131,6 +136,9 @@ class OpenCodeAgent(AgentBase):
     _on_activity: Callable[[], None] | None = PrivateAttr(default=None)
     _last_activity_signal_at: float = PrivateAttr(default=0.0)
     _subprocess_env: dict[str, str] | None = PrivateAttr(default=None)
+    _subagent_emit_state: dict[str, str | None] = PrivateAttr(default_factory=dict)
+    _seen_part_texts: dict[str, str] = PrivateAttr(default_factory=dict)
+    _child_session_ids: set[str] = PrivateAttr(default_factory=set)
 
     @property
     def supports_openhands_tools(self) -> bool:
@@ -238,14 +246,31 @@ class OpenCodeAgent(AgentBase):
             state.execution_status = ConversationExecutionStatus.FINISHED
             return
 
+        mask = state.secret_registry.mask_secrets_in_output
+        cwd = state.agent_state.get("opencode_session_cwd", "")
         self._signal_activity()
+        self._subagent_emit_state = {}
+        self._seen_part_texts = {}
+        self._child_session_ids = set()
+
+        done_event = asyncio.Event()
+        error_msg: list[str | None] = [None]
+
+        sse_task = asyncio.ensure_future(
+            self._consume_sse_stream(
+                session_id, cwd, on_event, on_token, mask, done_event, error_msg
+            )
+        )
+
         try:
-            async with httpx.AsyncClient(
-                timeout=self.opencode_prompt_timeout
-            ) as client:
-                response_data = await self._post_prompt(client, session_id, prompt_text)
+            await self._send_prompt_async(session_id, prompt_text)
         except Exception as exc:
-            logger.error("OpenCode prompt failed: %s", exc, exc_info=True)
+            logger.error("OpenCode prompt_async failed: %s", exc, exc_info=True)
+            sse_task.cancel()
+            try:
+                await sse_task
+            except (asyncio.CancelledError, Exception):
+                pass
             on_event(
                 MessageEvent(
                     source="agent",
@@ -265,34 +290,67 @@ class OpenCodeAgent(AgentBase):
             state.execution_status = ConversationExecutionStatus.ERROR
             return
 
-        # Parse the response: {"info": {...}, "parts": [...]}
-        # The POST /session/{id}/message endpoint returns the complete
-        # assistant message with parts for step-start, reasoning, text,
-        # and step-finish.
-        mask = state.secret_registry.mask_secrets_in_output
-        stream_text: list[str] = []
-        stream_reasoning: list[str] = []
+        try:
+            await asyncio.wait_for(
+                done_event.wait(), timeout=self.opencode_prompt_timeout
+            )
+        except TimeoutError:
+            logger.warning(
+                "OpenCode turn timed out after %ss", self.opencode_prompt_timeout
+            )
+            error_msg[0] = (
+                f"OpenCode turn timed out after {self.opencode_prompt_timeout}s"
+            )
+        finally:
+            sse_task.cancel()
+            try:
+                await sse_task
+            except (asyncio.CancelledError, Exception):
+                pass
 
-        # Check for model-level errors in the response info.
+        if error_msg[0]:
+            on_event(
+                MessageEvent(
+                    source="agent",
+                    llm_message=Message(
+                        role="assistant",
+                        content=[TextContent(text=f"OpenCode error: {error_msg[0]}")],
+                    ),
+                )
+            )
+            on_event(
+                ConversationErrorEvent(
+                    source="agent",
+                    code="OpenCodeModelError",
+                    detail=error_msg[0][:500],
+                )
+            )
+            state.execution_status = ConversationExecutionStatus.ERROR
+            return
+
+        self._emit_subagent_tool_call_events(
+            self._fetch_subagent_tool_call_events(session_id, mask), on_event
+        )
+
+        response_data = await self._fetch_final_response(session_id)
+
         info = response_data.get("info", {}) if isinstance(response_data, dict) else {}
         error_info = info.get("error") if isinstance(info, dict) else None
         if isinstance(error_info, dict):
-            # OpenCode nests the human-readable message under
-            # ``data.message``; check top-level keys first, then nested.
-            error_msg = _first_string(error_info, "message", "error", "detail")
-            if not error_msg:
+            error_msg_text = _first_string(error_info, "message", "error", "detail")
+            if not error_msg_text:
                 nested = error_info.get("data")
                 if isinstance(nested, dict):
-                    error_msg = _first_string(nested, "message", "error", "detail")
-            if not error_msg:
-                error_msg = str(error_info)
+                    error_msg_text = _first_string(nested, "message", "error", "detail")
+            if not error_msg_text:
+                error_msg_text = str(error_info)
             on_event(
                 MessageEvent(
                     source="agent",
                     llm_message=Message(
                         role="assistant",
                         content=[
-                            TextContent(text=f"OpenCode model error: {error_msg}")
+                            TextContent(text=f"OpenCode model error: {error_msg_text}")
                         ],
                     ),
                 )
@@ -301,7 +359,7 @@ class OpenCodeAgent(AgentBase):
                 ConversationErrorEvent(
                     source="agent",
                     code="OpenCodeModelError",
-                    detail=error_msg[:500],
+                    detail=error_msg_text[:500],
                 )
             )
             state.execution_status = ConversationExecutionStatus.ERROR
@@ -310,6 +368,8 @@ class OpenCodeAgent(AgentBase):
         parts = (
             response_data.get("parts", []) if isinstance(response_data, dict) else []
         )
+        stream_text: list[str] = []
+        stream_reasoning: list[str] = []
         for part in parts:
             if not isinstance(part, dict):
                 continue
@@ -318,35 +378,10 @@ class OpenCodeAgent(AgentBase):
                 text = mask(part.get("text", ""))
                 if text:
                     stream_text.append(text)
-                    if on_token is not None:
-                        on_token(
-                            ModelResponseStream(
-                                choices=[
-                                    StreamingChoices(
-                                        index=0,
-                                        delta=Delta(content=text),
-                                    )
-                                ]
-                            )
-                        )
             elif part_type == "reasoning":
                 text = mask(part.get("text", ""))
                 if text:
                     stream_reasoning.append(text)
-                    if on_token is not None:
-                        on_token(
-                            ModelResponseStream(
-                                choices=[
-                                    StreamingChoices(
-                                        index=0,
-                                        delta=Delta(
-                                            content=None,
-                                            reasoning_content=text,
-                                        ),
-                                    )
-                                ]
-                            )
-                        )
 
         response_text = mask("".join(stream_text))
         reasoning_text = mask("".join(stream_reasoning))
@@ -507,23 +542,6 @@ class OpenCodeAgent(AgentBase):
                     continue
         raise RuntimeError("Failed to create OpenCode session")
 
-    async def _post_prompt(
-        self, client: httpx.AsyncClient, session_id: str, prompt_text: str
-    ) -> Any:
-        assert self._base_url is not None
-        headers = self._headers(self._auth_header)
-        # The OpenCode v1/v2 API accepts a parts array on the
-        # /session/{id}/message endpoint, which blocks until the model
-        # finishes and returns the complete assistant message.
-        payload = {"parts": [{"type": "text", "text": prompt_text}]}
-        url = f"{self._base_url}/session/{session_id}/message"
-        response = await client.post(url, headers=headers, json=payload)
-        response.raise_for_status()
-        try:
-            return response.json() if response.content else {}
-        except Exception:
-            return {}
-
     def _latest_user_prompt(self, state: ConversationState) -> str:
         last_id = state.last_user_message_id
         for event in reversed(state.events):
@@ -564,6 +582,520 @@ class OpenCodeAgent(AgentBase):
             callback()
         except Exception:
             logger.debug("OpenCode activity callback failed", exc_info=True)
+
+    async def _send_prompt_async(self, session_id: str, prompt_text: str) -> None:
+        """Send a prompt via the non-blocking prompt_async endpoint."""
+        assert self._base_url is not None
+        headers = self._headers(self._auth_header)
+        payload = {"parts": [{"type": "text", "text": prompt_text}]}
+        url = f"{self._base_url}/session/{session_id}/prompt_async"
+        async with httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.post(url, headers=headers, json=payload)
+            response.raise_for_status()
+
+    async def _fetch_final_response(self, session_id: str) -> dict[str, Any]:
+        """Fetch the latest assistant message after the turn completes."""
+        assert self._base_url is not None
+        headers = self._headers(self._auth_header)
+        url = f"{self._base_url}/session/{session_id}/message"
+        async with httpx.AsyncClient(timeout=_DEFAULT_HTTP_TIMEOUT) as client:
+            response = await client.get(url, headers=headers)
+            if response.status_code >= 400:
+                return {}
+            messages = response.json()
+            if not isinstance(messages, list):
+                return {}
+            for msg in reversed(messages):
+                info = msg.get("info", {})
+                if isinstance(info, dict) and info.get("role") == "assistant":
+                    return msg
+            return {}
+
+    async def _consume_sse_stream(
+        self,
+        session_id: str,
+        cwd: str,
+        on_event: ConversationCallbackType,
+        on_token: ConversationTokenCallbackType | None,
+        mask: Callable[[str], str],
+        done_event: asyncio.Event,
+        error_msg: list[str | None],
+    ) -> None:
+        """Connect to OpenCode's SSE event stream and relay progress live.
+
+        Uses ``GET /event?directory=<cwd>`` — the ``directory`` query parameter
+        is required by OpenCode's workspace routing middleware to deliver
+        events for the correct project.  Processes ``message.part.updated``,
+        ``message.part.delta``, and ``session.idle`` events for our session,
+        streaming tool calls, text, and reasoning to the UI in real-time.
+        """
+        assert self._base_url is not None
+        headers = self._headers(self._auth_header)
+        url = f"{self._base_url}/event"
+        params = {"directory": cwd} if cwd else None
+        try:
+            async with httpx.AsyncClient(
+                timeout=httpx.Timeout(self.opencode_prompt_timeout, connect=10.0)
+            ) as client:
+                async with client.stream(
+                    "GET", url, headers=headers, params=params
+                ) as response:
+                    if response.status_code >= 400:
+                        logger.warning(
+                            "OpenCode SSE stream returned %d", response.status_code
+                        )
+                        return
+                    async for line in response.aiter_lines():
+                        if not line.startswith("data:"):
+                            continue
+                        payload_str = line[5:].strip()
+                        if not payload_str:
+                            continue
+                        try:
+                            event = json.loads(payload_str)
+                        except json.JSONDecodeError:
+                            continue
+                        self._handle_sse_event(
+                            event,
+                            session_id,
+                            on_event,
+                            on_token,
+                            mask,
+                            done_event,
+                            error_msg,
+                        )
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.debug("OpenCode SSE stream ended", exc_info=True)
+
+    def _handle_sse_event(
+        self,
+        event: dict[str, Any],
+        session_id: str,
+        on_event: ConversationCallbackType,
+        on_token: ConversationTokenCallbackType | None,
+        mask: Callable[[str], str],
+        done_event: asyncio.Event,
+        error_msg: list[str | None],
+    ) -> None:
+        """Process a single SSE event from the OpenCode event stream.
+
+        Events from the main session drive tool calls, text streaming, and
+        completion.  Events from child (subagent) sessions are also processed
+        so that subagent tool calls appear live in the UI, not just at the end.
+        """
+        event_type = event.get("type", "")
+        props = event.get("properties", {})
+        if not isinstance(props, dict):
+            return
+
+        event_session_id = props.get("sessionID")
+        is_main = event_session_id == session_id
+        is_child = (
+            event_session_id is not None and event_session_id in self._child_session_ids
+        )
+
+        if not is_main and not is_child:
+            # Track new child sessions via session.updated events that
+            # carry a parentSessionID matching our main session.
+            if event_type == "session.updated":
+                parent = props.get("parentSessionID")
+                if parent == session_id and event_session_id:
+                    self._child_session_ids.add(event_session_id)
+            return
+
+        if event_type == "message.part.updated":
+            part = props.get("part", {})
+            if not isinstance(part, dict):
+                return
+            if is_main:
+                self._handle_part_updated(part, on_event, on_token, mask)
+            elif is_child and event_session_id is not None:
+                self._handle_child_part_updated(part, event_session_id, on_event, mask)
+        elif event_type == "message.part.delta":
+            if is_main:
+                self._handle_part_delta(props, on_token, mask)
+        elif event_type == "session.idle":
+            if is_main:
+                self._signal_activity()
+                self._emit_subagent_tool_call_events(
+                    self._fetch_subagent_tool_call_events(session_id, mask), on_event
+                )
+                done_event.set()
+            elif is_child:
+                self._signal_activity()
+        elif event_type == "session.error":
+            if is_main:
+                error = props.get("error")
+                if isinstance(error, dict):
+                    error_msg[0] = _first_string(error, "message", "error", "detail")
+                elif isinstance(error, str):
+                    error_msg[0] = error
+                if not error_msg[0]:
+                    error_msg[0] = "Unknown OpenCode session error"
+                done_event.set()
+        elif event_type in (
+            "message.updated",
+            "session.updated",
+            "session.status",
+        ):
+            self._signal_activity()
+
+    def _handle_child_part_updated(
+        self,
+        part: dict[str, Any],
+        child_session_id: str,
+        on_event: ConversationCallbackType,
+        mask: Callable[[str], str],
+    ) -> None:
+        """Handle a ``message.part.updated`` event from a child (subagent) session.
+
+        Converts tool parts to ACPToolCallEvent tagged with the child's
+        session ID so the frontend groups them into a subagent panel.
+        """
+        part_type = part.get("type", "")
+        if part_type == "tool":
+            self._emit_tool_call_from_part(
+                part, on_event, mask, subagent_session_id=child_session_id
+            )
+            self._signal_activity()
+
+    def _handle_part_delta(
+        self,
+        props: dict[str, Any],
+        on_token: ConversationTokenCallbackType | None,
+        mask: Callable[[str], str],
+    ) -> None:
+        """Handle a ``message.part.delta`` event for incremental text."""
+        if on_token is None:
+            return
+        delta = props.get("delta", "")
+        field = props.get("field", "text")
+        if not isinstance(delta, str) or not delta:
+            return
+        delta = mask(delta)
+        if not delta:
+            return
+        if field == "text":
+            on_token(
+                ModelResponseStream(
+                    choices=[StreamingChoices(index=0, delta=Delta(content=delta))]
+                )
+            )
+        elif field == "reasoning":
+            on_token(
+                ModelResponseStream(
+                    choices=[
+                        StreamingChoices(
+                            index=0, delta=Delta(content=None, reasoning_content=delta)
+                        )
+                    ]
+                )
+            )
+        self._signal_activity()
+
+    def _handle_part_updated(
+        self,
+        part: dict[str, Any],
+        on_event: ConversationCallbackType,
+        on_token: ConversationTokenCallbackType | None,
+        mask: Callable[[str], str],
+    ) -> None:
+        """Handle a ``message.part.updated`` event for a single part."""
+        part_type = part.get("type", "")
+        part_id = part.get("id", "")
+
+        if part_type == "tool":
+            self._emit_tool_call_from_part(part, on_event, mask)
+            self._signal_activity()
+        elif part_type in ("text", "reasoning"):
+            self._stream_part_text_delta(part_id, part_type, part, on_token, mask)
+            self._signal_activity()
+        elif part_type in ("step-start", "step-finish", "subtask"):
+            self._signal_activity()
+
+    def _stream_part_text_delta(
+        self,
+        part_id: str,
+        part_type: str,
+        part: dict[str, Any],
+        on_token: ConversationTokenCallbackType | None,
+        mask: Callable[[str], str],
+    ) -> None:
+        """Stream incremental text or reasoning from a ``message.part.updated``.
+
+        OpenCode sends the full accumulated text on each ``part.updated``,
+        so we track the previously seen text per part ID and only emit the
+        delta.  Used for both ``text`` and ``reasoning`` part types.
+        """
+        if on_token is None:
+            return
+        text = mask(part.get("text", ""))
+        if not text:
+            return
+        prev = self._seen_part_texts.get(part_id, "")
+        delta_text = text[len(prev) :] if text.startswith(prev) else text
+        self._seen_part_texts[part_id] = text
+        if not delta_text:
+            return
+        if part_type == "text":
+            on_token(
+                ModelResponseStream(
+                    choices=[StreamingChoices(index=0, delta=Delta(content=delta_text))]
+                )
+            )
+        else:
+            on_token(
+                ModelResponseStream(
+                    choices=[
+                        StreamingChoices(
+                            index=0,
+                            delta=Delta(content=None, reasoning_content=delta_text),
+                        )
+                    ]
+                )
+            )
+
+    def _emit_tool_call_from_part(
+        self,
+        part: dict[str, Any],
+        on_event: ConversationCallbackType,
+        mask: Callable[[str], str],
+        subagent_session_id: str | None = None,
+    ) -> None:
+        """Convert an OpenCode ToolPart to an ACPToolCallEvent and emit it."""
+        event = self._tool_part_to_acp_event(part, mask, subagent_session_id)
+        if event is None:
+            return
+        emit_key = f"{subagent_session_id or 'main'}:{event.tool_call_id}"
+        if self._subagent_emit_state.get(emit_key) == event.status:
+            return
+        self._subagent_emit_state[emit_key] = event.status
+        try:
+            on_event(event)
+        except Exception:
+            logger.debug("Failed to emit tool call event", exc_info=True)
+
+    @staticmethod
+    def _map_tool_status(status: str) -> str:
+        return {
+            "completed": "completed",
+            "error": "failed",
+            "running": "in_progress",
+            "pending": "in_progress",
+        }.get(status, status)
+
+    @staticmethod
+    def _tool_part_to_acp_event(
+        part: dict[str, Any],
+        mask: Callable[[str], str],
+        subagent_session_id: str | None = None,
+        agent_name: str | None = None,
+    ) -> ACPToolCallEvent | None:
+        """Convert an OpenCode ToolPart dict to an ACPToolCallEvent.
+
+        Shared by both the SSE handler (live) and the REST poller (subagent
+        sweep).  Returns None if the part lacks a call ID.
+        """
+        call_id = part.get("callID", part.get("id", ""))
+        if not call_id:
+            return None
+        state = part.get("state", {})
+        if not isinstance(state, dict):
+            return None
+        status = state.get("status", "completed")
+        tool_name = part.get("tool", "")
+        title = state.get("title") or tool_name
+        raw_input = state.get("input")
+        raw_output = state.get("output") or state.get("error")
+        if isinstance(raw_output, str):
+            raw_output = maybe_truncate(
+                mask(raw_output), truncate_after=_MAX_TOOL_CONTENT_CHARS
+            )
+        if isinstance(title, str):
+            title = mask(title)
+        if isinstance(raw_input, str):
+            raw_input = mask(raw_input)
+        mapped_status = OpenCodeAgent._map_tool_status(status)
+        return ACPToolCallEvent(
+            tool_call_id=str(call_id),
+            title=title,
+            status=mapped_status,
+            tool_kind=None,
+            raw_input=raw_input,
+            raw_output=raw_output,
+            content=None,
+            is_error=(mapped_status == "failed"),
+            subagent_session_id=subagent_session_id,
+            agent_name=agent_name,
+        )
+
+    def _fetch_subagent_tool_call_events(
+        self,
+        session_id: str,
+        mask: Callable[[str], str],
+    ) -> list[ACPToolCallEvent]:
+        """Fetch ACPToolCallEvents for OpenCode subagent sessions via REST API.
+
+        Mirrors the ACP agent's approach: fetch child sessions, then for each
+        child fetch its messages and extract tool-call events, prompt, and
+        response — all tagged with the child's session id so the frontend
+        groups them into a subagent panel.
+        """
+        events: list[ACPToolCallEvent] = []
+        if not self._base_url:
+            return events
+        base = self._base_url
+        req_headers: dict[str, str] = {}
+        if self._auth_header:
+            req_headers["Authorization"] = self._auth_header
+        try:
+            req = urllib.request.Request(
+                f"{base}/session/{session_id}/children",
+                headers=req_headers,
+            )
+            with urllib.request.urlopen(req, timeout=5) as resp:
+                children: list[dict[str, Any]] = json.loads(resp.read())
+            if not children:
+                return events
+        except Exception as exc:
+            logger.debug(
+                "Could not fetch subagent children from OpenCode HTTP API: %s", exc
+            )
+            return events
+
+        for child in children:
+            child_id = child.get("id")
+            if not child_id:
+                continue
+            agent_name = child.get("agent") or child.get("title") or child_id
+            child_title = child.get("title") or agent_name or str(child_id)
+            assert isinstance(child_title, str)
+
+            try:
+                req = urllib.request.Request(
+                    f"{base}/session/{child_id}/message",
+                    headers=req_headers,
+                )
+                with urllib.request.urlopen(req, timeout=5) as resp:
+                    messages: list[dict[str, Any]] = json.loads(resp.read())
+            except Exception as exc:
+                logger.debug(
+                    "Could not fetch messages for subagent %s: %s", child_id, exc
+                )
+                messages = []
+
+            tool_events: list[ACPToolCallEvent] = []
+            prompt_text = ""
+            response_chunks: list[str] = []
+            for msg_envelope in messages:
+                info = msg_envelope.get("info", {})
+                role = (
+                    info.get("role")
+                    if isinstance(info, dict)
+                    else msg_envelope.get("role")
+                )
+                parts: list[dict[str, Any]] = msg_envelope.get("parts", [])
+                for part in parts:
+                    ptype = part.get("type")
+                    if ptype == "text":
+                        text = part.get("text")
+                        if not isinstance(text, str) or not text.strip():
+                            continue
+                        if role == "user" and not prompt_text:
+                            prompt_text = text
+                        elif role == "assistant":
+                            response_chunks.append(text)
+                        continue
+                    if ptype != "tool":
+                        continue
+                    event = self._tool_part_to_acp_event(
+                        part,
+                        mask,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                    if event is not None:
+                        tool_events.append(event)
+
+            response_text = "".join(response_chunks).strip()
+            session_active = (
+                any(te.status == "in_progress" for te in tool_events)
+                or not response_text
+            )
+
+            events.append(
+                ACPToolCallEvent(
+                    tool_call_id=f"session:{child_id}",
+                    title=child_title,
+                    status="in_progress" if session_active else "completed",
+                    tool_kind=None,
+                    raw_input=None,
+                    raw_output=None,
+                    content=None,
+                    is_error=False,
+                    subagent_session_id=child_id,
+                    agent_name=agent_name,
+                )
+            )
+            if prompt_text:
+                events.append(
+                    ACPToolCallEvent(
+                        tool_call_id=f"prompt:{child_id}",
+                        title="Prompt",
+                        status="completed",
+                        tool_kind=None,
+                        raw_input=None,
+                        raw_output=maybe_truncate(
+                            mask(prompt_text), truncate_after=_MAX_TOOL_CONTENT_CHARS
+                        ),
+                        content=None,
+                        is_error=False,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                )
+            events.extend(tool_events)
+            if response_text:
+                events.append(
+                    ACPToolCallEvent(
+                        tool_call_id=f"response:{child_id}",
+                        title="Response",
+                        status="completed",
+                        tool_kind=None,
+                        raw_input=None,
+                        raw_output=maybe_truncate(
+                            mask(response_text),
+                            truncate_after=_MAX_TOOL_CONTENT_CHARS,
+                        ),
+                        content=None,
+                        is_error=False,
+                        subagent_session_id=child_id,
+                        agent_name=agent_name,
+                    )
+                )
+        return events
+
+    def _emit_subagent_tool_call_events(
+        self,
+        events: list[ACPToolCallEvent],
+        on_event: ConversationCallbackType,
+    ) -> None:
+        """Emit subagent tool-call events, skipping ones already sent unchanged."""
+        for event in events:
+            key = f"{event.subagent_session_id or 'main'}:{event.tool_call_id}"
+            if self._subagent_emit_state.get(key) == event.status:
+                continue
+            self._subagent_emit_state[key] = event.status
+            try:
+                on_event(event)
+            except Exception:
+                logger.debug(
+                    "Failed to emit subagent tool call event for %s",
+                    key,
+                    exc_info=True,
+                )
 
     def close(self) -> None:
         if self._closed:
