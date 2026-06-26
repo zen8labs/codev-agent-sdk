@@ -353,7 +353,15 @@ def _package_version() -> str:
     """
     Get the semantic version from the openhands-sdk package.
     This is used as a fallback when git-tag-derived release tags are unavailable.
+
+    The ``SDK_VERSION`` env var overrides both sources, which is useful when
+    the desired image-tag version (e.g. ``1.28.0-z8l.1``) is not a valid
+    PEP 440 version and therefore cannot live in ``pyproject.toml``. The
+    override is not validated — it is used as a raw string.
     """
+    override = os.environ.get("SDK_VERSION")
+    if override:
+        return override
     try:
         from importlib.metadata import version
 

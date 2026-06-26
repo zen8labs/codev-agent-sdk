@@ -109,6 +109,45 @@ For a multi-arch release, add `linux/arm64` to `--platforms`. The
 if you need a single multi-arch manifest, run the GitHub Actions workflow
 against the `main` branch on a `v*` tag push.
 
+### Cutting a fork release (`1.28.0-z8l.1`)
+
+The image-tag version is the openhands-sdk package version, but
+`pyproject.toml` requires strict [PEP 440](https://peps.python.org/pep-0440/)
+syntax — so a fork suffix like `-z8l.1` cannot live there. The build script
+honors a `SDK_VERSION` env var that overrides the package version, so the
+package stays PEP 440 clean while the image gets a fork-friendly tag.
+
+```bash
+# 1. Pick the version (the package version stays at 1.28.0, the image tag uses 1.28.0-z8l.1)
+SDK_VERSION=1.28.0-z8l.1
+
+# 2. Build and push
+IMAGE=ghcr.io/oadtq/agent-server SDK_VERSION=$SDK_VERSION \
+  uv run --frozen ./openhands-agent-server/openhands/agent_server/docker/build.py \
+  --custom-tags python --target binary --platforms linux/amd64 \
+  --versioned-tag --push
+```
+
+The pushed tag set will be:
+
+```
+ghcr.io/oadtq/agent-server:1.28.0-z8l.1-python
+ghcr.io/oadtq/agent-server:<short-sha>-1.28.0-z8l.1-python
+ghcr.io/oadtq/agent-server:<long-sha>-1.28.0-z8l.1-python
+ghcr.io/oadtq/agent-server:main-1.28.0-z8l.1-python
+```
+
+Because the version is not strict semver (`1.28.0-z8l.1` does not match
+`X.Y.Z`), the build script does **not** emit the `1.28.0` / `1.28` / `1`
+alias ladder — only the single full tag. If you need those aliases, cut a
+clean PEP 440 version like `1.28.0` (no fork suffix) and rely on the
+`+local` segment instead (e.g. `1.28.0+z8l.1` produces tag
+`1.28.0+z8l.1-python`).
+
+For CI-driven releases, push a git tag whose name matches the image-tag
+suffix you want and set `SDK_VERSION` as a workflow env (see
+`.github/workflows/server.yml`).
+
 ### Validate the pushed image
 
 ```bash
