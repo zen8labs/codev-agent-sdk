@@ -64,7 +64,7 @@ class OpenHandsCloudWorkspace(RemoteWorkspace):
         workspace = OpenHandsCloudWorkspace(
             cloud_api_url="https://app.z8l-agent.dev",
             cloud_api_key="your-api-key",
-            sandbox_spec_id="ghcr.io/zen8labs/agent-server:main-python",
+            sandbox_spec_id="ghcr.io/oadtq/agent-server:main-python",
         )
 
         # Running inside a z8l-agent Cloud Runtime (local agent-server mode)

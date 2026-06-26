@@ -44,7 +44,7 @@ assert runtime_api_key, "RUNTIME_API_KEY required"
 # SDK_SHA is the canonical commit SHA set by CI workflows (avoids the
 # built-in GITHUB_SHA which resolves to the merge-commit on PRs).
 server_image_sha = os.getenv("SDK_SHA") or os.getenv("GITHUB_SHA") or "main"
-server_image = f"ghcr.io/zen8labs/agent-server:{server_image_sha[:7]}-python-amd64"
+server_image = f"ghcr.io/oadtq/agent-server:{server_image_sha[:7]}-python-amd64"
 logger.info(f"Using server image: {server_image}")
 
 with APIRemoteWorkspace(

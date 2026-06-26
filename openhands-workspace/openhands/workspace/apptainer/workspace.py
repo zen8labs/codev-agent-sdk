@@ -40,7 +40,7 @@ class ApptainerWorkspace(RemoteWorkspace):
 
     Example:
         with ApptainerWorkspace(
-            server_image="ghcr.io/zen8labs/agent-server:latest-python"
+            server_image="ghcr.io/oadtq/agent-server:latest-python"
         ) as workspace:
             result = workspace.execute_command("ls -la")
     """

@@ -97,14 +97,14 @@ jobs:
 
                   echo "✅ All packages are resolvable on PyPI!"
 
-            # OpenHands-CLI step runs first since it's simpler and less error-prone
-            - name: Create PR for OpenHands-CLI repo
+            # codev-agent-sdk step runs first since it's simpler and less error-prone
+            - name: Create PR for codev-agent-sdk repo
               env:
                   VERSION: ${{ steps.get_version.outputs.version }}
               run: |
                   set -euo pipefail
 
-                  REPO="OpenHands/openhands-cli"
+                  REPO="zen8labs/codev-agent-sdk"
                   BRANCH="bump-sdk-$VERSION"
 
                   echo "🔄 Creating PR for $REPO..."
@@ -127,7 +127,7 @@ jobs:
                     git checkout -b "$BRANCH"
                   fi
 
-                  # OpenHands-CLI currently requires Python 3.12, so resolve with that interpreter.
+                  # codev-agent-sdk currently requires Python 3.12, so resolve with that interpreter.
                   # The target repo uses exclude-newer-package to exempt openhands-sdk/tools
                   # from its 7-day freshness guardrail, so no UV_EXCLUDE_NEWER override
                   # is needed — doing so would actually break the per-package exemptions.
@@ -163,7 +163,7 @@ jobs:
                   - \`openhands-sdk\`
                   - \`openhands-tools\`
 
-                  **Triggered by:** Release of [software-agent-sdk v$VERSION](https://github.com/OpenHands/software-agent-sdk/releases/tag/v$VERSION)
+                  **Triggered by:** Release of [software-agent-sdk v$VERSION](https://github.com/zen8labs/codev-agent-sdk/releases/tag/v$VERSION)
 
                   ---
                   _This PR was automatically created by the version-bump-prs workflow._" \
@@ -179,7 +179,7 @@ jobs:
               run: |
                   set -euo pipefail
 
-                  REPO="OpenHands/OpenHands"
+                  REPO="zen8labs/codev-agent-sdk"
                   BRANCH="bump-sdk-$VERSION"
 
                   echo "🔄 Creating PR for $REPO..."
@@ -304,8 +304,8 @@ jobs:
                   SANDBOX_SPEC_FILE="openhands/app_server/sandbox/sandbox_spec_service.py"
                   if [ -f "$SANDBOX_SPEC_FILE" ]; then
                     # Update the AGENT_SERVER_IMAGE line with the new hash
-                    sed -i "s|AGENT_SERVER_IMAGE = 'ghcr.io/zen8labs/agent-server:[^']*'|AGENT_SERVER_IMAGE = 'ghcr.io/zen8labs/agent-server:${VERSION}-python'|" "$SANDBOX_SPEC_FILE"
-                    echo "✅ Updated AGENT_SERVER_IMAGE to: ghcr.io/zen8labs/agent-server:${VERSION}-python"
+                    sed -i "s|AGENT_SERVER_IMAGE = 'ghcr.io/oadtq/agent-server:[^']*'|AGENT_SERVER_IMAGE = 'ghcr.io/oadtq/agent-server:${VERSION}-python'|" "$SANDBOX_SPEC_FILE"
+                    echo "✅ Updated AGENT_SERVER_IMAGE to: ghcr.io/oadtq/agent-server:${VERSION}-python"
                   else
                     echo "❌ sandbox_spec_service.py not found at expected path"
                     exit 1
@@ -363,7 +363,7 @@ jobs:
                   - Updated \`AGENT_SERVER_IMAGE\` to \`${VERSION}\` in \`sandbox_spec_service.py\`
                   - Updated mypy \`additional_dependencies\` pins in \`.pre-commit-config.yaml\`
 
-                  **Triggered by:** Release of [software-agent-sdk v$VERSION](https://github.com/OpenHands/software-agent-sdk/releases/tag/v$VERSION)
+                  **Triggered by:** Release of [software-agent-sdk v$VERSION](https://github.com/zen8labs/codev-agent-sdk/releases/tag/v$VERSION)
 
                   ---
                   _This PR was automatically created by the version-bump-prs workflow._" \
@@ -381,8 +381,8 @@ jobs:
                   echo "" >> $GITHUB_STEP_SUMMARY
                   echo "PRs have been created to bump SDK packages to version **$VERSION**:" >> $GITHUB_STEP_SUMMARY
                   echo "" >> $GITHUB_STEP_SUMMARY
-                  echo "- [OpenHands](https://github.com/OpenHands/OpenHands/pulls?q=is%3Apr+bump-sdk-$VERSION)" >> $GITHUB_STEP_SUMMARY
-                  echo "- [OpenHands-CLI](https://github.com/OpenHands/openhands-cli/pulls?q=is%3Apr+bump-sdk-$VERSION)" >> $GITHUB_STEP_SUMMARY
+                  echo "- [OpenHands](https://github.com/zen8labs/codev-agent-sdk/pulls?q=is%3Apr+bump-sdk-$VERSION)" >> $GITHUB_STEP_SUMMARY
+                  echo "- [codev-agent-sdk](https://github.com/zen8labs/codev-agent-sdk/pulls?q=is%3Apr+bump-sdk-$VERSION)" >> $GITHUB_STEP_SUMMARY
 
             - name: Notify Slack
               if: env.SLACK_BOT_TOKEN != ''
@@ -392,4 +392,4 @@ jobs:
                   token: ${{ env.SLACK_BOT_TOKEN }}
                   payload: |
                       channel: C08E1SYKEM9
-                      text: "🚀 *SDK v${{ steps.get_version.outputs.version }} published to PyPI!*\n\nVersion bump PRs created:\n• <https://github.com/OpenHands/OpenHands/pulls?q=is%3Apr+bump-sdk-${{ steps.get_version.outputs.version }}|OpenHands>\n• <https://github.com/OpenHands/openhands-cli/pulls?q=is%3Apr+bump-sdk-${{ steps.get_version.outputs.version }}|OpenHands-CLI>\n\n<https://github.com/OpenHands/software-agent-sdk/releases/tag/v${{ steps.get_version.outputs.version }}|View Release>"
+                      text: "🚀 *SDK v${{ steps.get_version.outputs.version }} published to PyPI!*\n\nVersion bump PRs created:\n• <https://github.com/zen8labs/codev-agent-sdk/pulls?q=is%3Apr+bump-sdk-${{ steps.get_version.outputs.version }}|OpenHands>\n• <https://github.com/zen8labs/codev-agent-sdk/pulls?q=is%3Apr+bump-sdk-${{ steps.get_version.outputs.version }}|codev-agent-sdk>\n\n<https://github.com/zen8labs/codev-agent-sdk/releases/tag/v${{ steps.get_version.outputs.version }}|View Release>"

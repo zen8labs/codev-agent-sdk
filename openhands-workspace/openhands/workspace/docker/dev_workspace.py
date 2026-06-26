@@ -56,7 +56,7 @@ class DockerDevWorkspace(DockerWorkspace):
             raise ValueError(
                 "Exactly one of 'base_image' or 'server_image' must be set."
             )
-        if self.base_image and "ghcr.io/zen8labs/agent-server" in self.base_image:
+        if self.base_image and "ghcr.io/oadtq/agent-server" in self.base_image:
             raise ValueError(
                 "base_image cannot be a pre-built agent-server image. "
                 "Use server_image=... instead."
@@ -83,7 +83,7 @@ class DockerDevWorkspace(DockerWorkspace):
         """
         from openhands.agent_server.docker.build import BuildOptions, build
 
-        if "ghcr.io/zen8labs/agent-server" in base_image:
+        if "ghcr.io/oadtq/agent-server" in base_image:
             raise RuntimeError(
                 "base_image cannot be a pre-built agent-server image. "
                 "Use server_image=... instead."

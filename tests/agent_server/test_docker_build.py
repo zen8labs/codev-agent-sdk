@@ -448,9 +448,9 @@ def test_all_tags_include_short_long_sha_and_branch():
     )
 
     assert opts.all_tags == [
-        "ghcr.io/zen8labs/agent-server:abc1234-python",
-        "ghcr.io/zen8labs/agent-server:abc1234567890fedcba-python",
-        "ghcr.io/zen8labs/agent-server:feature-release-1-python",
+        "ghcr.io/oadtq/agent-server:abc1234-python",
+        "ghcr.io/oadtq/agent-server:abc1234567890fedcba-python",
+        "ghcr.io/oadtq/agent-server:feature-release-1-python",
     ]
 
 
@@ -469,14 +469,14 @@ def test_all_tags_includes_versioned_tags():
 
     all_tags = opts.all_tags
 
-    assert "ghcr.io/zen8labs/agent-server:abc1234-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:abc1234567890-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234567890-python" in all_tags
     # Versioned tags use bare semver (no "v" prefix)
-    assert "ghcr.io/zen8labs/agent-server:1-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2.0-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2.0-java" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1-java" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2.0-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2.0-java" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1-java" in all_tags
 
 
 def test_all_tags_excludes_versioned_tags_when_disabled():
@@ -494,10 +494,10 @@ def test_all_tags_excludes_versioned_tags_when_disabled():
 
     all_tags = opts.all_tags
 
-    assert "ghcr.io/zen8labs/agent-server:abc1234-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:abc1234567890-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:main-python" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1-python" not in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234567890-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:main-python" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1-python" not in all_tags
 
 
 def test_all_tags_with_arch_suffix():
@@ -517,10 +517,10 @@ def test_all_tags_with_arch_suffix():
     all_tags = opts.all_tags
 
     # Versioned tags use bare semver (no "v" prefix)
-    assert "ghcr.io/zen8labs/agent-server:1-python-amd64" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2-python-amd64" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2.0-python-amd64" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:abc1234567890-python-amd64" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1-python-amd64" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2-python-amd64" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2.0-python-amd64" in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234567890-python-amd64" in all_tags
 
 
 def test_all_tags_with_target_suffix():
@@ -539,10 +539,10 @@ def test_all_tags_with_target_suffix():
 
     all_tags = opts.all_tags
 
-    assert "ghcr.io/zen8labs/agent-server:1-python-source" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2-python-source" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:1.2.0-python-source" in all_tags
-    assert "ghcr.io/zen8labs/agent-server:abc1234567890-python-source" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1-python-source" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2-python-source" in all_tags
+    assert "ghcr.io/oadtq/agent-server:1.2.0-python-source" in all_tags
+    assert "ghcr.io/oadtq/agent-server:abc1234567890-python-source" in all_tags
 
 
 def test_make_build_context_reuses_prebuilt_sdist_without_running_uv_build(
