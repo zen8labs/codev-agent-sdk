@@ -25,7 +25,7 @@ class APIRemoteWorkspace(RemoteWorkspace):
         workspace = APIRemoteWorkspace(
             runtime_api_url="https://runtime.eval.z8l-agent.dev",
             runtime_api_key="your-api-key",
-            server_image="ghcr.io/openhands/agent-server:lastest-python",
+            server_image="ghcr.io/zen8labs/agent-server:latest-python",
         )
     """  # noqa: E501
 

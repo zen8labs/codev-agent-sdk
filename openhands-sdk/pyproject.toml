@@ -25,10 +25,10 @@ dependencies = [
 ]
 
 [project.urls]
-Source = "https://github.com/OpenHands/software-agent-sdk"
-Homepage = "https://github.com/OpenHands/software-agent-sdk"
+Source = "https://github.com/zen8labs/codev-agent-sdk"
+Homepage = "https://github.com/zen8labs/codev-agent-sdk"
 Documentation = "https://docs.z8l-agent.dev/sdk"
-"Bug Tracker" = "https://github.com/OpenHands/software-agent-sdk/issues"
+"Bug Tracker" = "https://github.com/zen8labs/codev-agent-sdk/issues"
 
 [project.optional-dependencies]
 boto3 = ["boto3>=1.35.0"]

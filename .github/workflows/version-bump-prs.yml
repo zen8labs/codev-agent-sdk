@@ -304,8 +304,8 @@ jobs:
                   SANDBOX_SPEC_FILE="openhands/app_server/sandbox/sandbox_spec_service.py"
                   if [ -f "$SANDBOX_SPEC_FILE" ]; then
                     # Update the AGENT_SERVER_IMAGE line with the new hash
-                    sed -i "s|AGENT_SERVER_IMAGE = 'ghcr.io/openhands/agent-server:[^']*'|AGENT_SERVER_IMAGE = 'ghcr.io/openhands/agent-server:${VERSION}-python'|" "$SANDBOX_SPEC_FILE"
-                    echo "✅ Updated AGENT_SERVER_IMAGE to: ghcr.io/openhands/agent-server:${VERSION}-python"
+                    sed -i "s|AGENT_SERVER_IMAGE = 'ghcr.io/zen8labs/agent-server:[^']*'|AGENT_SERVER_IMAGE = 'ghcr.io/zen8labs/agent-server:${VERSION}-python'|" "$SANDBOX_SPEC_FILE"
+                    echo "✅ Updated AGENT_SERVER_IMAGE to: ghcr.io/zen8labs/agent-server:${VERSION}-python"
                   else
                     echo "❌ sandbox_spec_service.py not found at expected path"
                     exit 1

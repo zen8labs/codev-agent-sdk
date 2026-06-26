@@ -220,7 +220,7 @@ jobs:
                     )
                 ) ||
                 github.event_name == 'workflow_dispatch' ||
-                (github.event_name == 'schedule' && github.repository == 'OpenHands/software-agent-sdk')
+                (github.event_name == 'schedule' && github.repository == 'zen8labs/codev-agent-sdk')
             ) && needs.setup-matrix.result == 'success'
         needs: [setup-matrix, post-label-comment, post-dispatch-comment]
         runs-on: ubuntu-24.04
@@ -385,7 +385,7 @@ jobs:
                     )
                 ) ||
                 github.event_name == 'workflow_dispatch' ||
-                (github.event_name == 'schedule' && github.repository == 'OpenHands/software-agent-sdk')
+                (github.event_name == 'schedule' && github.repository == 'zen8labs/codev-agent-sdk')
             )
         runs-on: ubuntu-24.04
         permissions:
