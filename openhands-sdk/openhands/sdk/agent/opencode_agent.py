@@ -163,6 +163,7 @@ class OpenCodeAgent(AgentBase):
     _subagent_emit_state: dict[str, str | None] = PrivateAttr(default_factory=dict)
     _seen_part_texts: dict[str, str] = PrivateAttr(default_factory=dict)
     _child_session_ids: set[str] = PrivateAttr(default_factory=set)
+    _server_process: subprocess.Popen | None = PrivateAttr(default=None)
     # Port chosen by ``_start_server`` when the start command did not already
     # specify one. Stored so ``_try_port_from_command`` can rediscover the
     # daemon without relying on ``server.json`` (which ``opencode serve`` does
@@ -330,6 +331,7 @@ class OpenCodeAgent(AgentBase):
             error_msg[0] = (
                 f"OpenCode turn timed out after {self.opencode_prompt_timeout}s"
             )
+            self._reset_after_timeout(state)
         finally:
             sse_task.cancel()
             try:
@@ -574,7 +576,7 @@ class OpenCodeAgent(AgentBase):
             ]
         env = {**os.environ, **(self._subprocess_env or {})}
         try:
-            subprocess.Popen(
+            self._server_process = subprocess.Popen(
                 command,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
@@ -584,7 +586,7 @@ class OpenCodeAgent(AgentBase):
             )
             logger.info("Started OpenCode daemon with %s", command)
         except FileNotFoundError:
-            subprocess.Popen(
+            self._server_process = subprocess.Popen(
                 fallback,
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL,
@@ -1178,6 +1180,20 @@ class OpenCodeAgent(AgentBase):
                     exc_info=True,
                 )
 
+    def _reset_after_timeout(self, state: ConversationState) -> None:
+        """Clear cached session/daemon state after a turn timeout.
+
+        The OpenCode daemon may be stuck processing the previous prompt.
+        Clearing the cached session ID forces the next step to create a
+        fresh session, and clearing the base URL forces
+        ``_ensure_server_ready`` to re-check (and potentially restart)
+        the daemon.
+        """
+        state.agent_state.pop("opencode_session_id", None)
+        state.agent_state.pop("opencode_session_cwd", None)
+        self._base_url = None
+        self._auth_header = None
+
     def close(self) -> None:
         if self._closed:
             return
@@ -1185,3 +1201,14 @@ class OpenCodeAgent(AgentBase):
         if self._executor is not None:
             self._executor.close()
             self._executor = None
+        if self._server_process is not None:
+            try:
+                self._server_process.terminate()
+                self._server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                self._server_process.kill()
+                self._server_process.wait(timeout=2)
+            except Exception:
+                logger.debug("Error terminating OpenCode daemon", exc_info=True)
+            finally:
+                self._server_process = None

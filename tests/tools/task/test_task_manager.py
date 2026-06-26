@@ -942,3 +942,53 @@ class TestTaskManagerPersistence:
         conv_persistence = conv.state.persistence_dir
         assert conv_persistence is not None
         assert str(conv_persistence).startswith(str(manager._persistence_dir))
+
+
+class TestTaskManagerTimeout:
+    """Tests for the task_timeout watchdog in _run_until_finished."""
+
+    def setup_method(self):
+        _reset_registry_for_tests()
+
+    def teardown_method(self):
+        _reset_registry_for_tests()
+
+    def test_task_timeout_defaults_to_none(self, tmp_path):
+        """Without task_timeout, no watchdog is armed."""
+        manager = TaskManager()
+        assert manager._task_timeout is None
+
+    def test_task_timeout_stored(self, tmp_path):
+        manager = TaskManager(task_timeout=300.0)
+        assert manager._task_timeout == 300.0
+
+    def test_run_until_finished_interrupts_on_timeout(self, tmp_path):
+        """When task_timeout fires, conversation.interrupt() is called."""
+        manager, _ = _manager_with_parent(tmp_path)
+        manager._task_timeout = 0.05
+
+        mock_conv = MagicMock()
+        mock_conv.state.execution_status = __import__(
+            "openhands.sdk.conversation.state",
+            fromlist=["ConversationExecutionStatus"],
+        ).ConversationExecutionStatus.FINISHED
+        mock_conv.run.side_effect = lambda: __import__("time").sleep(1.0)
+
+        manager._run_until_finished("task_test", mock_conv)
+
+        mock_conv.interrupt.assert_called_once()
+
+    def test_run_until_finished_cancels_timer_on_completion(self, tmp_path):
+        """When conversation finishes before timeout, timer is cancelled."""
+        manager, _ = _manager_with_parent(tmp_path)
+        manager._task_timeout = 10.0
+
+        mock_conv = MagicMock()
+        mock_conv.state.execution_status = __import__(
+            "openhands.sdk.conversation.state",
+            fromlist=["ConversationExecutionStatus"],
+        ).ConversationExecutionStatus.FINISHED
+
+        manager._run_until_finished("task_test", mock_conv)
+
+        mock_conv.interrupt.assert_not_called()

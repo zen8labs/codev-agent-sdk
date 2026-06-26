@@ -71,3 +71,75 @@ def test_start_server_preserves_explicit_port() -> None:
 
     assert agent._chosen_port is None
     assert mock_popen.call_args.args[0] == ["opencode", "serve", "--port", "7777"]
+
+
+def test_start_server_stores_popen_handle() -> None:
+    """_start_server must store the Popen handle for later cleanup."""
+    agent = OpenCodeAgent(opencode_start_command=["opencode", "serve", "--port", "1"])
+    mock_proc = MagicMock()
+
+    with patch("subprocess.Popen", return_value=mock_proc):
+        agent._start_server()
+
+    assert agent._server_process is mock_proc
+
+
+def test_close_terminates_daemon() -> None:
+    """close() must terminate the spawned OpenCode daemon."""
+    agent = OpenCodeAgent(opencode_start_command=["opencode", "serve", "--port", "1"])
+    mock_proc = MagicMock()
+    mock_proc.wait.return_value = 0
+    agent._server_process = mock_proc
+
+    agent.close()
+
+    mock_proc.terminate.assert_called_once()
+    mock_proc.wait.assert_called_once()
+    assert agent._server_process is None
+
+
+def test_close_kills_daemon_on_terminate_timeout() -> None:
+    """If terminate doesn't finish in time, close() should kill the process."""
+    import subprocess
+
+    agent = OpenCodeAgent(opencode_start_command=["opencode", "serve", "--port", "1"])
+    mock_proc = MagicMock()
+    mock_proc.wait.side_effect = [
+        subprocess.TimeoutExpired(cmd="opencode", timeout=5),
+        0,
+    ]
+    agent._server_process = mock_proc
+
+    agent.close()
+
+    mock_proc.terminate.assert_called_once()
+    mock_proc.kill.assert_called_once()
+    assert agent._server_process is None
+
+
+def test_close_is_idempotent() -> None:
+    """Calling close() twice should not error."""
+    agent = OpenCodeAgent(opencode_start_command=[])
+    agent.close()
+    agent.close()
+    assert agent._closed
+
+
+def test_reset_after_timeout_clears_session_state() -> None:
+    """_reset_after_timeout must clear cached session/daemon state."""
+    agent = OpenCodeAgent(opencode_start_command=[])
+    agent._base_url = "http://127.0.0.1:9999"
+    agent._auth_header = "Bearer token"
+
+    state = MagicMock()
+    state.agent_state = {
+        "opencode_session_id": "sess-123",
+        "opencode_session_cwd": "/workspace",
+    }
+
+    agent._reset_after_timeout(state)
+
+    assert "opencode_session_id" not in state.agent_state
+    assert "opencode_session_cwd" not in state.agent_state
+    assert agent._base_url is None
+    assert agent._auth_header is None

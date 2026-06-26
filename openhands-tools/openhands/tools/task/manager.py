@@ -95,9 +95,11 @@ class TaskManager:
     def __init__(
         self,
         confirmation_handler: ConfirmationHandler | None = None,
+        task_timeout: float | None = None,
     ):
         self._parent_conversation: LocalConversation | None = None
         self._confirmation_handler = confirmation_handler
+        self._task_timeout = task_timeout
 
         self._tasks: dict[str, Task] = {}
         self._tasks_lock = threading.Lock()
@@ -361,23 +363,40 @@ class TaskManager:
     def _run_until_finished(
         self, task_id: str, conversation: LocalConversation
     ) -> None:
-        """Run a sub-agent conversation to completion, handling confirmations."""
-        conversation.run()
-        while (
-            conversation.state.execution_status
-            == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
-        ):
-            pending = ConversationState.get_unmatched_actions(conversation.state.events)
-            if not pending:
-                break
+        """Run a sub-agent conversation to completion, handling confirmations.
 
-            if self._confirmation_handler is None or self._confirmation_handler(
-                task_id, pending
+        If ``task_timeout`` is set, a watchdog thread calls
+        ``conversation.interrupt()`` after the deadline so the run loop
+        breaks at the next iteration boundary instead of blocking forever.
+        """
+        if self._task_timeout is not None:
+            timer = threading.Timer(self._task_timeout, conversation.interrupt)
+            timer.daemon = True
+            timer.start()
+        else:
+            timer = None
+        try:
+            conversation.run()
+            while (
+                conversation.state.execution_status
+                == ConversationExecutionStatus.WAITING_FOR_CONFIRMATION
             ):
-                conversation.run()
-            else:
-                conversation.reject_pending_actions("User rejected the actions")
-                conversation.run()
+                pending = ConversationState.get_unmatched_actions(
+                    conversation.state.events
+                )
+                if not pending:
+                    break
+
+                if self._confirmation_handler is None or self._confirmation_handler(
+                    task_id, pending
+                ):
+                    conversation.run()
+                else:
+                    conversation.reject_pending_actions("User rejected the actions")
+                    conversation.run()
+        finally:
+            if timer is not None:
+                timer.cancel()
 
     def _set_confirmation_policy(
         self,
