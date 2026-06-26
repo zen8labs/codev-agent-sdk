@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import socket
 import subprocess
 import time
 import urllib.error
@@ -66,6 +67,29 @@ def _first_string(mapping: dict[str, Any], *keys: str) -> str | None:
         if isinstance(value, str) and value.strip():
             return value.strip()
     return None
+
+
+def _command_has_port(command: list[str]) -> bool:
+    """Return True if ``command`` already specifies an explicit ``--port``."""
+    for i, arg in enumerate(command):
+        if arg == "--port" and i + 1 < len(command):
+            return True
+        # ``--port=NNNN`` form
+        if arg.startswith("--port=") and len(arg) > len("--port="):
+            return True
+    return False
+
+
+def _pick_free_port() -> int:
+    """Bind to port 0 to let the OS pick a free TCP port, then release it.
+
+    There is an inherent TOCTOU race (the port could be reclaimed before
+    ``opencode serve`` binds it); the readiness loop in ``_ensure_server_ready``
+    retries for 30s, so a collision is recovered from rather than fatal.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
 
 
 def _extract_session_id(payload: Any) -> str | None:
@@ -139,6 +163,11 @@ class OpenCodeAgent(AgentBase):
     _subagent_emit_state: dict[str, str | None] = PrivateAttr(default_factory=dict)
     _seen_part_texts: dict[str, str] = PrivateAttr(default_factory=dict)
     _child_session_ids: set[str] = PrivateAttr(default_factory=set)
+    # Port chosen by ``_start_server`` when the start command did not already
+    # specify one. Stored so ``_try_port_from_command`` can rediscover the
+    # daemon without relying on ``server.json`` (which ``opencode serve`` does
+    # not write in current builds).
+    _chosen_port: int | None = PrivateAttr(default=None)
 
     @property
     def supports_openhands_tools(self) -> bool:
@@ -433,8 +462,11 @@ class OpenCodeAgent(AgentBase):
                 # opencode_http_base override), try extracting a port from
                 # the start command and pinging it directly.  This covers
                 # the fresh-daemon race where server.json hasn't been
-                # written yet.
-                if base_url is None and self.opencode_start_command:
+                # written yet.  ``_start_server`` ensures a ``--port`` is
+                # present on the command (current ``opencode serve`` builds
+                # never write ``server.json``, so without an explicit port
+                # the daemon would be undiscoverable).
+                if base_url is None:
                     fallback_url = self._try_port_from_command()
                     if fallback_url and await self._ping(fallback_url, auth_header):
                         return fallback_url, auth_header
@@ -486,12 +518,21 @@ class OpenCodeAgent(AgentBase):
         return base_url, auth_header
 
     def _try_port_from_command(self) -> str | None:
-        """Extract a ``--port`` value from the start command, if present."""
+        """Discover the daemon's HTTP URL from its start command.
+
+        Looks for an explicit ``--port N`` in ``opencode_start_command`` first
+        (covers user-supplied commands), then falls back to the port chosen by
+        ``_start_server`` when it augmented the default command with
+        ``--port`` (covers the auto-spawned default, since current
+        ``opencode serve`` builds do not write ``server.json``).
+        """
         for i, arg in enumerate(self.opencode_start_command):
             if arg == "--port" and i + 1 < len(self.opencode_start_command):
                 port_str = self.opencode_start_command[i + 1]
                 if port_str.isdigit():
                     return f"http://127.0.0.1:{port_str}"
+        if self._chosen_port is not None:
+            return f"http://127.0.0.1:{self._chosen_port}"
         return None
 
     async def _ping(self, base_url: str, auth_header: str | None) -> bool:
@@ -511,8 +552,26 @@ class OpenCodeAgent(AgentBase):
         return False
 
     def _start_server(self) -> None:
-        command = self.opencode_start_command or ["opencode", "serve"]
+        command = list(self.opencode_start_command) or ["opencode", "serve"]
+        # ``opencode serve`` does not write ``server.json``/``password`` in
+        # current builds, so ``_load_server_credentials`` cannot rediscover an
+        # auto-spawned daemon. Ensure an explicit ``--port`` is present and
+        # remember it on ``self`` so ``_try_port_from_command`` can ping the
+        # daemon directly. Skip the rewrite only when the caller already
+        # pinned a port.
+        if not _command_has_port(command):
+            port = _pick_free_port()
+            command = [*command, "--port", str(port)]
+            self._chosen_port = port
+        else:
+            self._chosen_port = None
         fallback = ["npx", "-y", "@opencode-ai/cli", "serve"]
+        if not _command_has_port(fallback):
+            fallback = [
+                *fallback,
+                "--port",
+                str(self._chosen_port or _pick_free_port()),
+            ]
         env = {**os.environ, **(self._subprocess_env or {})}
         try:
             subprocess.Popen(
