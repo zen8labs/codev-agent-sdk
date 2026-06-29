@@ -141,6 +141,14 @@ RUN set -eux; \
     mkdir -p /workspace/project; \
     chown -R "${USERNAME}:${USERNAME}" /workspace
 
+# Deploy custom OpenCode task tool plugin that spawns subagents via
+# `opencode run` subprocesses instead of in-process sessions. This avoids
+# the known subagent hang in serve/ACP mode (OpenCode issue #6573).
+# OpenCode scans {tool,tools}/*.{js,ts} in the workspace directory.
+COPY --chown=${USERNAME}:${USERNAME} \
+    openhands-agent-server/openhands/agent_server/docker/opencode-plugin/tool/task.js \
+    /workspace/project/tool/task.js
+
 # Pre-install ACP servers for ACPAgent support (Claude Code, Codex, Gemini CLI)
 # Install Node.js 22 to a dedicated prefix so ACP packages get a modern runtime
 # WITHOUT overwriting the repo-specific Node.js that test suites depend on.

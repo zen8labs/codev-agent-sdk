@@ -9,6 +9,7 @@ Moreover, it registers the two tool classes TaskTool (the individual tool)
 and TaskToolSet (the entry-point that wires up a TaskManager-backed executor).
 """
 
+import os
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, Final
 
@@ -245,7 +246,10 @@ class TaskToolSet(ToolDefinition[TaskAction, TaskObservation]):
             task_tool_examples=task_tool_examples,
         )
 
-        manager = TaskManager(confirmation_handler=confirmation_handler)
+        task_timeout = float(os.environ.get("OPENHANDS_TASK_TIMEOUT", "0")) or None
+        manager = TaskManager(
+            confirmation_handler=confirmation_handler, task_timeout=task_timeout
+        )
         task_executor = TaskExecutor(manager=manager)
 
         tools: list[ToolDefinition] = []

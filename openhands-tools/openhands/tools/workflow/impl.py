@@ -6,6 +6,7 @@ import ast
 import asyncio
 import inspect
 import json as jsonlib
+import os
 from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING, Any, Protocol
 
@@ -85,7 +86,8 @@ class WorkflowContext:
         self._parent_conversation = parent_conversation
         self._max_concurrency = max_concurrency
         if manager is None:
-            task_manager = TaskManager()
+            task_timeout = float(os.environ.get("OPENHANDS_TASK_TIMEOUT", "0")) or None
+            task_manager = TaskManager(task_timeout=task_timeout)
             task_manager.attach_parent(parent_conversation)
             self._manager = task_manager
         else:
