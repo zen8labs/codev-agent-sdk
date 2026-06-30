@@ -53,6 +53,152 @@ _DEFAULT_HTTP_TIMEOUT = float(os.environ.get("OPENCODE_HTTP_TIMEOUT", "30"))
 _ACTIVITY_SIGNAL_INTERVAL = 30.0
 _MAX_TOOL_CONTENT_CHARS = 30_000
 
+# Custom OpenCode task tool plugin that overrides the builtin task tool.
+# The builtin creates in-process subagent sessions that hang indefinitely in
+# serve mode. This override spawns separate `opencode run` subprocesses.
+# OpenCode scans {tool,tools}/*.{js,ts} in the session's working directory.
+_TASK_PLUGIN_JS = """\
+import { spawn } from "child_process"
+import { mkdtempSync } from "fs"
+import { join } from "path"
+import { tmpdir } from "os"
+
+const TASK_TIMEOUT_MS = 120000
+const TASK_MAX_BUFFER = 10 * 1024 * 1024
+
+function parseResult(stdout) {
+  let responseText = ""
+  let sessionID = null
+  for (const line of stdout.trim().split("\\n")) {
+    if (!line.trim()) continue
+    try {
+      const event = JSON.parse(line)
+      if (event.type === "session" && event.data?.id) {
+        sessionID = event.data.id
+      } else if (event.type === "message" && event.data?.role === "assistant") {
+        for (const part of event.data?.parts || []) {
+          if (part.type === "text") {
+            responseText += part.text || ""
+          }
+        }
+      }
+    } catch {}
+  }
+  return { text: responseText, sessionID }
+}
+
+function runSubagent(prompt, agentType, cwd, env) {
+  return new Promise((resolve) => {
+    const stateDir = mkdtempSync(join(tmpdir(), "opencode-subagent-"))
+    const subEnv = { ...env, XDG_STATE_HOME: stateDir }
+    const args = [
+      "run", "--format", "json", "--dangerously-skip-permissions",
+      "--agent", agentType || "general",
+      prompt,
+    ]
+    const proc = spawn("opencode", args, {
+      cwd,
+      env: subEnv,
+      stdio: ["ignore", "pipe", "pipe"],
+      maxBuffer: TASK_MAX_BUFFER,
+    })
+    let stdout = ""
+    let stderr = ""
+    const timer = setTimeout(() => {
+      proc.kill("SIGTERM")
+      setTimeout(() => proc.kill("SIGKILL"), 5000)
+    }, TASK_TIMEOUT_MS)
+    proc.stdout.on("data", (chunk) => { stdout += chunk })
+    proc.stderr.on("data", (chunk) => { stderr += chunk })
+    proc.on("close", (code) => {
+      clearTimeout(timer)
+      const { text, sessionID } = parseResult(stdout)
+      resolve({
+        success: code === 0,
+        text: text || stderr.slice(-500) || `(subagent exited with code ${code})`,
+        sessionID,
+        code,
+      })
+    })
+    proc.on("error", (err) => {
+      clearTimeout(timer)
+      resolve({
+        success: false,
+        text: `Subagent error: ${err.message}`,
+        sessionID: null,
+        code: -1,
+      })
+    })
+  })
+}
+
+export default {
+  description: (
+    "Launch a subagent to perform a specialized task. "
+    + "The subagent runs as a separate opencode run process for reliability."
+  ),
+  args: {
+    description: {
+      type: "string",
+      description: "A short (3-5 words) description of the task",
+    },
+    prompt: {
+      type: "string",
+      description: "The task for the agent to perform",
+    },
+    subagent_type: {
+      type: "string",
+      description: "The type of specialized agent to use for this task",
+    },
+    task_id: {
+      type: "string",
+      description: "Resume a previous task (optional)",
+    },
+    command: {
+      type: "string",
+      description: "The command that triggered this task (optional)",
+    },
+  },
+  execute: async (args, ctx) => {
+    const { description, prompt, subagent_type } = args
+    const cwd = ctx?.directory || process.cwd()
+    const result = await runSubagent(prompt, subagent_type, cwd, { ...process.env })
+    const state = result.success ? "completed" : "error"
+    const tag = result.success ? "task_result" : "task_error"
+    return {
+      title: description,
+      metadata: {
+        subagent_type,
+        process_mode: "opencode-run",
+        session_id: result.sessionID,
+      },
+      output: [
+        `<task state="${state}">`,
+        `<${tag}>`,
+        result.text,
+        `</${tag}>`,
+        "</task>",
+      ].join("\\n"),
+    }
+  },
+}
+"""
+
+
+def _ensure_task_plugin(cwd: str) -> None:
+    """Write the custom task tool plugin to the workspace if not present.
+
+    OpenCode scans {tool,tools}/*.{js,ts} in the session's working directory.
+    The plugin overrides the builtin task tool (which hangs in serve mode)
+    with subprocess-based execution via ``opencode run``.
+    """
+    plugin_path = Path(cwd) / "tool" / "task.js"
+    if plugin_path.exists():
+        return
+    plugin_path.parent.mkdir(parents=True, exist_ok=True)
+    plugin_path.write_text(_TASK_PLUGIN_JS, encoding="utf-8")
+    logger.debug("Wrote OpenCode task plugin to %s", plugin_path)
+
 
 def _state_dir_from_env() -> Path:
     base = os.environ.get("XDG_STATE_HOME")
@@ -221,6 +367,7 @@ class OpenCodeAgent(AgentBase):
         self._auth_header = auth_header
 
         cwd = str(state.workspace.working_dir) if state.workspace else os.getcwd()
+        _ensure_task_plugin(cwd)
         prior_session_id = state.agent_state.get("opencode_session_id")
         prior_session_cwd = state.agent_state.get("opencode_session_cwd")
         if (
