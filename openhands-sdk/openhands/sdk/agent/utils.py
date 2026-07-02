@@ -184,6 +184,7 @@ def fix_malformed_tool_arguments(
 TOOL_NAME_ALIASES: dict[str, str] = {
     "bash": "terminal",
     "command": "terminal",
+    "codegraph": "codegraph_explore",
     "execute": "terminal",
     "execute_bash": "terminal",
     "git": "terminal",

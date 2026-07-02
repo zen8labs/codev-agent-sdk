@@ -198,6 +198,20 @@ RUN set -ux; \
     fi; \
     rm -f "$NODE_TARBALL" 2>/dev/null || true
 
+# --- CodeGraph CLI (semantic code exploration) ---
+# Install to /usr/local/bin so the openhands runtime user can invoke it.
+# Env vars must be passed to `sh` (not only to curl) when using curl | sh.
+ARG CODEGRAPH_VERSION=v1.0.1
+RUN set -eux; \
+    curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
+        https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh \
+        | CODEGRAPH_VERSION="${CODEGRAPH_VERSION}" \
+          CODEGRAPH_INSTALL_DIR=/opt/codegraph \
+          CODEGRAPH_BIN_DIR=/usr/local/bin \
+          sh; \
+    command -v codegraph >/dev/null; \
+    codegraph --version
+
 # Configure Claude Code managed settings for headless operation:
 # Allow all tool permissions (no human in the loop to approve).
 RUN mkdir -p /etc/claude-code && \

@@ -440,10 +440,14 @@ class AgentBase(DiscriminatedUnionMixin, ABC):
             return self.system_prompt
 
         template_kwargs = dict(self.system_prompt_kwargs)
-        # Auto-detect browser tools from the tool spec list
+        # Auto-detect optional tools from the tool spec list (no preset changes needed).
         template_kwargs.setdefault(
             "enable_browser",
             any(t.name == "browser_tool_set" for t in self.tools),
+        )
+        template_kwargs.setdefault(
+            "enable_codegraph",
+            any(t.name == "codegraph_explore" for t in self.tools),
         )
         # Add security_policy_filename to template kwargs
         template_kwargs["security_policy_filename"] = self.security_policy_filename

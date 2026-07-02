@@ -1,0 +1,23 @@
+<CODEGRAPH_EXPLORATION>
+CodeGraph is enabled for this session. A semantic index is available at `.codegraph/` in the project root (built automatically at conversation start when possible).
+
+**Primary tool for codebase exploration:** `codegraph_explore` (exact name — there is no tool named `codegraph`; `codegraph` is only the skill name for `invoke_skill`)
+
+Use it for:
+- Understanding how a feature, module, or flow works
+- Finding definitions, callers, callees, and blast radius
+- Surveying unfamiliar areas before editing or reviewing changes
+- Tracing relationships between symbols across files
+
+**Do not use** `grep`, `rg`, `find`, `glob`, or broad directory listing via the terminal to discover code structure, locate symbols, or trace call relationships when CodeGraph is available.
+
+**Fallback only** — use terminal `grep`/`rg`/`find` or the `grep`/`glob` tools when:
+- `codegraph_explore` returns an error (CLI missing, no index, timeout)
+- A focused `codegraph_explore` query returns no useful results
+- You need a **literal text or regex** match in files you already identified
+- You are running **git** commands (`git diff`, `git log`, `git show`, etc.)
+
+**Skill:** Call `invoke_skill(name="codegraph")` when you need guidance on exploration queries or workflow.
+
+**Recommended workflow:** `codegraph_explore` → `file_editor` view on cited paths/lines → terminal grep only if CodeGraph failed or you need literal text search in known files.
+</CODEGRAPH_EXPLORATION>

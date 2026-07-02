@@ -74,6 +74,7 @@ a = Analysis(
         *collect_data_files("mcp"),
         *collect_data_files("fakeredis"),  # Required for commands.json used by fakeredis ACL
         *get_fakeredis_data(),  # Ensure fakeredis/model/ directory structure exists
+        *collect_data_files("binaryornot"),  # file_editor imports binaryornot.data signatures
 
         # OpenHands SDK prompt templates (adjusted for shallow namespace layout)
         *collect_data_files("openhands.sdk.agent", includes=["prompts/*.j2"]),

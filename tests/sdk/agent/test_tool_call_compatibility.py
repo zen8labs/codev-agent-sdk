@@ -628,7 +628,18 @@ def test_malformed_tool_name_bash_xml_tag(tmp_path):
     assert "hello" in observation_event.observation.text
 
 
-def test_malformed_tool_name_no_fix_when_no_match():
+def test_codegraph_alias_maps_to_codegraph_explore():
+    """Models often call ``codegraph``; canonical tool name is ``codegraph_explore``."""
+    from openhands.sdk.agent.utils import normalize_tool_call
+
+    available_tools = {"codegraph_explore", "terminal"}
+    tool_name, args = normalize_tool_call(
+        "codegraph",
+        {"query": "callers of main"},
+        available_tools,
+    )
+    assert tool_name == "codegraph_explore"
+    assert args == {"query": "callers of main"}
     """Test that truly malformed names that don't match any alias return original."""
     from openhands.sdk.agent.utils import normalize_tool_call
 
