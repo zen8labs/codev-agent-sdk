@@ -61,9 +61,7 @@ def _get_env(prompt_dir: str) -> Environment:
     # BytecodeCache avoids reparsing templates across processes
     # Use user-specific cache directory to avoid permission issues
     # in multi-user environments
-    cache_folder = os.path.join(
-        os.path.expanduser("~"), ".z8l-agent", "cache", "jinja"
-    )
+    cache_folder = os.path.join(os.path.expanduser("~"), ".z8l-agent", "cache", "jinja")
     os.makedirs(cache_folder, exist_ok=True)
     bcc = FileSystemBytecodeCache(directory=cache_folder)
     env = Environment(

@@ -42,6 +42,7 @@ namespaces = true
 "openhands.agent_server" = [
   "docker/Dockerfile",
   "docker/wallpaper.svg",
+  "docker/opencode-plugin/**/*.js",
   "vscode_extensions/**/*.json",
   "vscode_extensions/**/*.js",
 ]
