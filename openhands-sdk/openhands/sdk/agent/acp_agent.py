@@ -3038,7 +3038,7 @@ class ACPAgent(AgentBase):
         for child in children:
             child_id = child.get("id")
             agent_name = child.get("agent") or child.get("title") or child_id
-            child_title = child.get("title") or agent_name or child_id
+            child_title = str(child.get("title") or agent_name or child_id)
             if not child_id:
                 continue
 

@@ -407,6 +407,7 @@ class AgentBase(DiscriminatedUnionMixin, ABC):
     # Runtime materialized tools; private and non-serializable
     _tools: dict[str, ToolDefinition] = PrivateAttr(default_factory=dict)
     _initialized: bool = PrivateAttr(default=False)
+    _on_activity: Any = PrivateAttr(default=None)
 
     @property
     def prompt_dir(self) -> str:
