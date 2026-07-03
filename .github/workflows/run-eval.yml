@@ -145,13 +145,14 @@ env:
 jobs:
     print-parameters:
         if: >
-            github.event_name == 'release' ||
+            vars.CI_MODE != 'minimal' &&
+            (github.event_name == 'release' ||
             github.event_name == 'workflow_dispatch' ||
             (github.event_name == 'pull_request_target' &&
              (github.event.label.name == 'run-eval-1' ||
               github.event.label.name == 'run-eval-50' ||
               github.event.label.name == 'run-eval-200' ||
-              github.event.label.name == 'run-eval-500'))
+              github.event.label.name == 'run-eval-500')))
         runs-on: ubuntu-latest
         steps:
             - name: Print all parameters

@@ -14,6 +14,7 @@ jobs:
     create-release:
         # Only run when a release PR is merged (not just closed)
         if: >
+            vars.CI_MODE != 'minimal' &&
             github.event.pull_request.merged == true &&
             startsWith(github.event.pull_request.head.ref, 'rel-')
         runs-on: ubuntu-24.04

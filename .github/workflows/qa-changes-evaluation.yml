@@ -19,6 +19,7 @@ permissions:
 
 jobs:
     evaluate:
+        if: vars.CI_MODE != 'minimal'
         runs-on: ubuntu-24.04
         env:
             PR_NUMBER: ${{ github.event.pull_request.number }}

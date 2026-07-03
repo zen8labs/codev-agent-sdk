@@ -28,12 +28,37 @@ permissions:
     packages: write
 
 jobs:
+    resolve-ci-mode:
+        name: Resolve CI configuration
+        runs-on: ubuntu-24.04
+        outputs:
+            is-minimal: ${{ steps.config.outputs.is-minimal }}
+            binary-os: ${{ steps.config.outputs.binary-os }}
+            build-matrix: ${{ steps.config.outputs.build-matrix }}
+            merge-variants: ${{ steps.config.outputs.merge-variants }}
+        steps:
+            - id: config
+              shell: bash
+              run: |
+                  if [[ "${{ vars.CI_MODE }}" == "minimal" ]]; then
+                      echo "is-minimal=true" >> $GITHUB_OUTPUT
+                      echo 'binary-os=["ubuntu-latest"]' >> $GITHUB_OUTPUT
+                      echo 'build-matrix=[{"variant":"python","arch":"amd64","base_image":"nikolaik/python-nodejs:python3.13-nodejs22-slim","runner":"ubuntu-24.04","platform":"linux/amd64"}]' >> $GITHUB_OUTPUT
+                      echo 'merge-variants=["python"]' >> $GITHUB_OUTPUT
+                  else
+                      echo "is-minimal=false" >> $GITHUB_OUTPUT
+                      echo 'binary-os=["ubuntu-latest","macos-latest","windows-latest"]' >> $GITHUB_OUTPUT
+                      echo 'build-matrix=[{"variant":"python","arch":"amd64","base_image":"nikolaik/python-nodejs:python3.13-nodejs22-slim","runner":"ubuntu-24.04","platform":"linux/amd64"},{"variant":"python","arch":"arm64","base_image":"nikolaik/python-nodejs:python3.13-nodejs22-slim","runner":"ubuntu-24.04-arm","platform":"linux/arm64"},{"variant":"java","arch":"amd64","base_image":"eclipse-temurin:17-jdk","runner":"ubuntu-24.04","platform":"linux/amd64"},{"variant":"java","arch":"arm64","base_image":"eclipse-temurin:17-jdk","runner":"ubuntu-24.04-arm","platform":"linux/arm64"},{"variant":"golang","arch":"amd64","base_image":"golang:1.21-bookworm","runner":"ubuntu-24.04","platform":"linux/amd64"},{"variant":"golang","arch":"arm64","base_image":"golang:1.21-bookworm","runner":"ubuntu-24.04-arm","platform":"linux/arm64"}]' >> $GITHUB_OUTPUT
+                      echo 'merge-variants=["python","java","golang"]' >> $GITHUB_OUTPUT
+                  fi
+
     build-binary-and-test:
+        needs: resolve-ci-mode
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix:
-                os: [ubuntu-latest, macos-latest, windows-latest]
+                os: ${{ fromJSON(needs.resolve-ci-mode.outputs.binary-os) }}
         steps:
             - uses: actions/checkout@v6
 
@@ -260,6 +285,7 @@ jobs:
 
     build-and-push-image:
         name: Build & Push (${{ matrix.variant }}-${{ matrix.arch }})
+        needs: resolve-ci-mode
         # Run on push events, pull requests from the same repository (not forks), and manual workflow_dispatch
         # Fork PRs cannot push to GHCR and would fail authentication
         if: >
@@ -270,47 +296,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                # Explicit matrix: 3 variants × 2 architectures = 6 jobs
-                # Each job specifies exactly what it builds and where it runs
-                include:
-                    # Python variant
-                    - variant: python
-                      arch: amd64
-                      base_image: nikolaik/python-nodejs:python3.13-nodejs22-slim
-                      runner: ubuntu-24.04
-                      platform: linux/amd64
-
-                    - variant: python
-                      arch: arm64
-                      base_image: nikolaik/python-nodejs:python3.13-nodejs22-slim
-                      runner: ubuntu-24.04-arm
-                      platform: linux/arm64
-
-                    # Java variant
-                    - variant: java
-                      arch: amd64
-                      base_image: eclipse-temurin:17-jdk
-                      runner: ubuntu-24.04
-                      platform: linux/amd64
-
-                    - variant: java
-                      arch: arm64
-                      base_image: eclipse-temurin:17-jdk
-                      runner: ubuntu-24.04-arm
-                      platform: linux/arm64
-
-                    # Golang variant
-                    - variant: golang
-                      arch: amd64
-                      base_image: golang:1.21-bookworm
-                      runner: ubuntu-24.04
-                      platform: linux/amd64
-
-                    - variant: golang
-                      arch: arm64
-                      base_image: golang:1.21-bookworm
-                      runner: ubuntu-24.04-arm
-                      platform: linux/arm64
+                include: ${{ fromJSON(needs.resolve-ci-mode.outputs.build-matrix) }}
 
         runs-on: ${{ matrix.runner }}
 
@@ -470,7 +456,7 @@ jobs:
 
     merge-manifests:
         name: Merge Multi-Arch Manifests
-        needs: build-and-push-image
+        needs: [resolve-ci-mode, build-and-push-image]
         if: >
             github.event_name == 'push' ||
             github.event_name == 'workflow_dispatch' ||
@@ -479,7 +465,7 @@ jobs:
         runs-on: ubuntu-24.04
         strategy:
             matrix:
-                variant: [python, java, golang]
+                variant: ${{ fromJSON(needs.resolve-ci-mode.outputs.merge-variants) }}
         env:
             IMAGE: ${{ inputs.image != '' && inputs.image || 'ghcr.io/oadtq/agent-server' }}
 
@@ -532,9 +518,19 @@ jobs:
                       local source_tag=${2:-$1}
 
                       echo "Creating multi-arch manifest: ${IMAGE}:${manifest_tag}"
-                      docker buildx imagetools create -t ${IMAGE}:${manifest_tag} \
-                        ${IMAGE}:${source_tag}-amd64 \
-                        ${IMAGE}:${source_tag}-arm64
+                      # Collect available architecture tags (minimal mode may only have amd64)
+                      local source_images=()
+                      for arch in amd64 arm64; do
+                          local arch_tag="${IMAGE}:${source_tag}-${arch}"
+                          if docker buildx imagetools inspect "$arch_tag" >/dev/null 2>&1; then
+                              source_images+=("$arch_tag")
+                          fi
+                      done
+                      if [ ${#source_images[@]} -eq 0 ]; then
+                          echo "ERROR: no architecture tags found for ${source_tag}"
+                          return 1
+                      fi
+                      docker buildx imagetools create -t "${IMAGE}:${manifest_tag}" "${source_images[@]}"
 
                       echo "Inspecting multi-arch manifest:"
                       docker buildx imagetools inspect ${IMAGE}:${manifest_tag}

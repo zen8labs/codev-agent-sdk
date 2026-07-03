@@ -8,6 +8,7 @@ on:
 jobs:
     version-bump-guard:
         name: Check package versions
+        if: vars.CI_MODE != 'minimal'
         runs-on: ubuntu-latest
         permissions:
             contents: read

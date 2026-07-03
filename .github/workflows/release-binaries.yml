@@ -30,6 +30,7 @@ permissions:
 jobs:
     resolve-tag:
         name: Resolve artifact and image tag
+        if: vars.CI_MODE != 'minimal'
         runs-on: ubuntu-24.04
         outputs:
             tag: ${{ steps.resolve.outputs.tag }}

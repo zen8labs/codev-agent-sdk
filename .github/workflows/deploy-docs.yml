@@ -10,6 +10,7 @@ on:
     workflow_dispatch:
 jobs:
     dispatch:
+        if: vars.CI_MODE != 'minimal'
         runs-on: ubuntu-24.04
         permissions:
             contents: write

@@ -33,7 +33,7 @@ permissions:
 
 jobs:
     smoke-clone:
-        if: github.event_name == 'workflow_dispatch' && inputs.mode == 'smoke-clone'
+        if: vars.CI_MODE != 'minimal' && github.event_name == 'workflow_dispatch' && inputs.mode == 'smoke-clone'
         runs-on: ubuntu-latest
         steps:
             - name: Checkout repository

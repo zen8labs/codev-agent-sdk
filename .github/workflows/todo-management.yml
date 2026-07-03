@@ -47,9 +47,10 @@ jobs:
         runs-on: ubuntu-24.04
     # Only run if triggered manually or if 'automatic-todo' label was added
         if: >
-            github.event_name == 'workflow_dispatch' ||
+            vars.CI_MODE != 'minimal' &&
+            (github.event_name == 'workflow_dispatch' ||
             (github.event_name == 'pull_request' &&
-             github.event.label.name == 'automatic-todo')
+             github.event.label.name == 'automatic-todo'))
         outputs:
             todos: ${{ steps.scan.outputs.todos }}
             todo-count: ${{ steps.scan.outputs.todo-count }}

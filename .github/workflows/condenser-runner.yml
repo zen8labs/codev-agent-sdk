@@ -20,6 +20,7 @@ env:
 jobs:
     post-initial-comment:
         if: >
+            vars.CI_MODE != 'minimal' &&
             github.event_name == 'pull_request_target' &&
             github.event.label.name == 'condenser-test'
         runs-on: ubuntu-latest

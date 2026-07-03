@@ -23,7 +23,7 @@ permissions:
 jobs:
     run-task:
         # Only run scheduled jobs in the main repository, not in forks
-        if: github.repository == 'zen8labs/codev-agent-sdk' || github.event_name == 'workflow_dispatch'
+        if: vars.CI_MODE != 'minimal' && (github.repository == 'zen8labs/codev-agent-sdk' || github.event_name == 'workflow_dispatch')
         runs-on: ubuntu-24.04
         env:
             # Configuration (modify these values as needed)

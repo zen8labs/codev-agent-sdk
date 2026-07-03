@@ -13,6 +13,7 @@ on:
 
 jobs:
     create-version-bump-prs:
+        if: vars.CI_MODE != 'minimal'
         runs-on: ubuntu-24.04
         env:
             GH_TOKEN: ${{ secrets.OPENHANDS_BOT_GITHUB_PAT_PUBLIC }}

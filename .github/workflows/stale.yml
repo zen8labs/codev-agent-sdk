@@ -14,7 +14,7 @@ permissions:
 jobs:
     stale:
         # Only run scheduled jobs in the main repository, not in forks
-        if: github.repository == 'zen8labs/codev-agent-sdk'
+        if: vars.CI_MODE != 'minimal' && github.repository == 'zen8labs/codev-agent-sdk'
         runs-on: ubuntu-22.04
         steps:
             - uses: actions/stale@v10
