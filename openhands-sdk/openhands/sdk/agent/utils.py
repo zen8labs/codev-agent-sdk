@@ -183,10 +183,16 @@ def fix_malformed_tool_arguments(
 
 TOOL_NAME_ALIASES: dict[str, str] = {
     "bash": "terminal",
+    "callees": "list_callees",
+    "callers": "list_callers",
+    "codegraph": "codegraph_explore",
     "command": "terminal",
+    "definition": "go_to_definition",
     "execute": "terminal",
     "execute_bash": "terminal",
     "git": "terminal",
+    "goto_definition": "go_to_definition",
+    "references": "find_references",
     "reset": "terminal",
     "str_replace": "file_editor",
     "str_replace_editor": "file_editor",

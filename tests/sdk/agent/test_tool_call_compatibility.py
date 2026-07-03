@@ -628,17 +628,53 @@ def test_malformed_tool_name_bash_xml_tag(tmp_path):
     assert "hello" in observation_event.observation.text
 
 
-def test_malformed_tool_name_no_fix_when_no_match():
+def test_codegraph_alias_maps_to_codegraph_explore():
+    """Models often call ``codegraph``; canonical tool name is ``codegraph_explore``."""
+    from openhands.sdk.agent.utils import normalize_tool_call
+
+    available_tools = {"codegraph_explore", "terminal"}
+    tool_name, args = normalize_tool_call(
+        "codegraph",
+        {"query": "callers of main"},
+        available_tools,
+    )
+    assert tool_name == "codegraph_explore"
+    assert args == {"query": "callers of main"}
+
+
+@pytest.mark.parametrize(
+    ("alias", "canonical", "args"),
+    [
+        ("callers", "list_callers", {"symbol": "main"}),
+        ("callees", "list_callees", {"symbol": "main"}),
+        ("definition", "go_to_definition", {"symbol": "main"}),
+        ("references", "find_references", {"symbol": "main"}),
+    ],
+)
+def test_codegraph_navigation_aliases(alias, canonical, args):
+    from openhands.sdk.agent.utils import normalize_tool_call
+
+    available_tools = {
+        "codegraph_explore",
+        "go_to_definition",
+        "find_references",
+        "list_callers",
+        "list_callees",
+    }
+    tool_name, normalized_args = normalize_tool_call(alias, args, available_tools)
+    assert tool_name == canonical
+    assert normalized_args == args
+
+
+def test_malformed_tool_name_unchanged():
     """Test that truly malformed names that don't match any alias return original."""
     from openhands.sdk.agent.utils import normalize_tool_call
 
     available_tools = {"terminal", "file_editor"}
 
-    # "straight" doesn't match any alias or tool, so it should remain unchanged
     tool_name, args = normalize_tool_call("straight", {}, available_tools)
     assert tool_name == "straight", "Unknown malformed name should remain unchanged"
 
-    # "xyz123 </invalid>" doesn't match any known alias
     tool_name, args = normalize_tool_call("xyz123 </invalid>", {}, available_tools)
     assert tool_name == "xyz123 </invalid>", (
         "Non-matching malformed name should remain unchanged"

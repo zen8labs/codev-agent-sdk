@@ -1,5 +1,6 @@
 """Default preset configuration for OpenHands agents."""
 
+import os
 from pathlib import Path
 
 from openhands.sdk import Agent, agent_definition_to_factory, load_agents_from_dir
@@ -14,6 +15,15 @@ from openhands.sdk.tool import Tool
 
 
 logger = get_logger(__name__)
+
+
+def _is_codegraph_enabled() -> bool:
+    return os.getenv("OH_ENABLE_CODEGRAPH", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "on",
+    )
 
 
 def register_default_tools(enable_browser: bool = True) -> None:
@@ -31,6 +41,12 @@ def register_default_tools(enable_browser: bool = True) -> None:
         from openhands.tools.browser_use import BrowserToolSet
 
         logger.debug(f"Tool: {BrowserToolSet.name} registered.")
+
+    if _is_codegraph_enabled():
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
+
+        for tool_cls in CODEGRAPH_TOOL_CLASSES:
+            logger.debug(f"Tool: {tool_cls.name} registered.")
 
 
 def get_default_tools(
@@ -64,6 +80,10 @@ def get_default_tools(
         from openhands.tools.task import TaskToolSet
 
         tools.append(Tool(name=TaskToolSet.name))
+    if _is_codegraph_enabled():
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
+
+        tools.extend(Tool(name=tool_cls.name) for tool_cls in CODEGRAPH_TOOL_CLASSES)
     return tools
 
 

@@ -5,6 +5,7 @@ from openhands.sdk.context.condenser import LLMSummarizingCondenser
 from openhands.sdk.llm.llm import LLM
 from openhands.sdk.logger import get_logger
 from openhands.sdk.tool import Tool
+from openhands.tools.preset.default import _is_codegraph_enabled
 
 
 logger = get_logger(__name__)
@@ -126,11 +127,17 @@ def get_planning_tools(plan_path: str | None = None) -> list[Tool]:
     if plan_path:
         planning_tool_params["plan_path"] = plan_path
 
-    return [
+    tools = [
         Tool(name=GlobTool.name),
         Tool(name=GrepTool.name),
         Tool(name=PlanningFileEditorTool.name, params=planning_tool_params),
     ]
+    if _is_codegraph_enabled():
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
+
+        for index, tool_cls in enumerate(CODEGRAPH_TOOL_CLASSES):
+            tools.insert(index, Tool(name=tool_cls.name))
+    return tools
 
 
 def get_planning_condenser(llm: LLM) -> LLMSummarizingCondenser:
