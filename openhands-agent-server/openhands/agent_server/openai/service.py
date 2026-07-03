@@ -40,8 +40,8 @@ from openhands.sdk.llm.llm_profile_store import LLMProfileStore
 from openhands.sdk.llm.message import ImageContent, TextContent
 from openhands.sdk.settings import (
     ACPAgentSettings,
-    OpenHandsAgentSettings,
     OpenCodeAgentSettings,
+    OpenHandsAgentSettings,
 )
 from openhands.sdk.workspace import LocalWorkspace
 
