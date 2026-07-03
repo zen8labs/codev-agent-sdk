@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 from collections.abc import Generator
 from pathlib import Path
@@ -344,7 +346,12 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
 
     def _fetch_agent_settings(
         self,
-    ) -> "OpenHandsAgentSettings | LLMAgentSettings | ACPAgentSettings | OpenCodeAgentSettings":
+    ) -> (
+        OpenHandsAgentSettings
+        | LLMAgentSettings
+        | ACPAgentSettings
+        | OpenCodeAgentSettings
+    ):
         """Call ``GET /api/settings`` and return a validated settings model.
 
         Uses ``X-Expose-Secrets: plaintext`` so secret fields (e.g. LLM
@@ -388,7 +395,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
         retry=tenacity.retry_if_exception(_is_retryable_error),
         reraise=True,
     )
-    def get_llm(self, profile_name: str | None = None, **llm_kwargs: Any) -> "LLM":
+    def get_llm(self, profile_name: str | None = None, **llm_kwargs: Any) -> LLM:
         """Fetch LLM settings from persisted settings or a named profile.
 
         Args:
@@ -433,7 +440,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
         retry=tenacity.retry_if_exception(_is_retryable_error),
         reraise=True,
     )
-    def get_secrets(self, names: list[str] | None = None) -> dict[str, "LookupSecret"]:
+    def get_secrets(self, names: list[str] | None = None) -> dict[str, LookupSecret]:
         """Build ``LookupSecret`` references for the agent-server's secrets.
 
         Fetches the list of available secret **names** from the agent-server
@@ -812,7 +819,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
 
     def _convert_skills_dict_to_list(
         self, skills_by_name: dict[str, dict[str, Any]]
-    ) -> list["Skill"]:
+    ) -> list[Skill]:
         """Convert skill dicts to SDK Skill objects."""
         loaded_skills: list[Skill] = []
         for skill_data in skills_by_name.values():
@@ -824,7 +831,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
                 logger.warning(f"Failed to convert skill {skill_name}: {e}")
         return loaded_skills
 
-    def _convert_skill_data_to_skill(self, skill_data: dict[str, Any]) -> "Skill":
+    def _convert_skill_data_to_skill(self, skill_data: dict[str, Any]) -> Skill:
         """Convert skill dict from API response to SDK Skill object.
 
         Args:
@@ -864,7 +871,7 @@ class RemoteWorkspace(RemoteWorkspaceMixin, BaseWorkspace):
         load_project: bool = True,
         load_org: bool = True,
         timeout: float = 60.0,
-    ) -> tuple[list["Skill"], "AgentContext"]:
+    ) -> tuple[list[Skill], AgentContext]:
         """Load skills via the agent-server's /api/skills endpoint.
 
         This method calls the agent-server running inside the sandbox to load
