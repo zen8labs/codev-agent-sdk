@@ -1,0 +1,17 @@
+<CODEGRAPH_NAVIGATION>
+CodeGraph navigation tools complement `codegraph_explore` for targeted symbol lookups.
+
+**When to use which tool:**
+
+| Intent | Tool |
+|--------|------|
+| Broad architecture, flows, "how does X work" | `codegraph_explore` (primary) |
+| Where is symbol X defined? | `go_to_definition` |
+| Who calls X? (precise call sites) | `list_callers` |
+| What does X call? | `list_callees` |
+| Survey usages of X (approximate) | `find_references` |
+
+**`find_references` limitation (temporary):** Runs multiple CLI commands (`callers`, `impact`, `query`) and merges output. It does **not** match IDE/LSP find-references. Use `list_callers` for precise call sites. The "Symbol matches (query)" section lists name matches for disambiguation — **not** reference sites.
+
+**Workflow:** `codegraph_explore` or a navigation tool → `file_editor` view on cited paths/lines → terminal grep only if CodeGraph failed or for literal text in known files.
+</CODEGRAPH_NAVIGATION>

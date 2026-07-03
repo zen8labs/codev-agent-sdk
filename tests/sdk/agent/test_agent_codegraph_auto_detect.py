@@ -29,6 +29,12 @@ def _make_llm() -> LLM:
             id="other_tools_only",
         ),
         pytest.param(
+            [Tool(name="list_callers")],
+            {},
+            True,
+            id="navigation_tool_present",
+        ),
+        pytest.param(
             [Tool(name="codegraph_explore")],
             {"enable_codegraph": False},
             False,
@@ -42,5 +48,6 @@ def test_codegraph_auto_detect(tools, prompt_kwargs, expect_codegraph):
     msg = agent.static_system_message
     if expect_codegraph:
         assert "<CODEGRAPH_EXPLORATION>" in msg
+        assert "<CODEGRAPH_NAVIGATION>" in msg
     else:
         assert "<CODEGRAPH_EXPLORATION>" not in msg

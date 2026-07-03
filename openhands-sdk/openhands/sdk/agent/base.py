@@ -51,6 +51,16 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+_CODEGRAPH_TOOL_NAMES = frozenset(
+    {
+        "codegraph_explore",
+        "go_to_definition",
+        "find_references",
+        "list_callers",
+        "list_callees",
+    }
+)
+
 
 def _decrypt_mcp_value_or_keep(cipher: Cipher, value: str) -> str:
     if not value.startswith(FERNET_TOKEN_PREFIX):
@@ -447,7 +457,7 @@ class AgentBase(DiscriminatedUnionMixin, ABC):
         )
         template_kwargs.setdefault(
             "enable_codegraph",
-            any(t.name == "codegraph_explore" for t in self.tools),
+            any(t.name in _CODEGRAPH_TOOL_NAMES for t in self.tools),
         )
         # Add security_policy_filename to template kwargs
         template_kwargs["security_policy_filename"] = self.security_policy_filename

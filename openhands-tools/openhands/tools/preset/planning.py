@@ -133,9 +133,10 @@ def get_planning_tools(plan_path: str | None = None) -> list[Tool]:
         Tool(name=PlanningFileEditorTool.name, params=planning_tool_params),
     ]
     if _is_codegraph_enabled():
-        from openhands.tools.codegraph import CodegraphExploreTool
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
 
-        tools.insert(0, Tool(name=CodegraphExploreTool.name))
+        for index, tool_cls in enumerate(CODEGRAPH_TOOL_CLASSES):
+            tools.insert(index, Tool(name=tool_cls.name))
     return tools
 
 

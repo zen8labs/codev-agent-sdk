@@ -201,7 +201,7 @@ RUN set -ux; \
 # --- CodeGraph CLI (semantic code exploration) ---
 # Install to /usr/local/bin so the openhands runtime user can invoke it.
 # Env vars must be passed to `sh` (not only to curl) when using curl | sh.
-ARG CODEGRAPH_VERSION=v1.0.1
+ARG CODEGRAPH_VERSION=v1.2.0
 RUN set -eux; \
     curl -fsSL --retry 5 --retry-delay 2 --retry-connrefused \
         https://raw.githubusercontent.com/colbymchenry/codegraph/main/install.sh \

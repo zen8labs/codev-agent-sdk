@@ -51,8 +51,8 @@ def test_codegraph_tool_invalid_working_dir():
         CodegraphExploreTool.create(conv_state)
 
 
-@patch("openhands.tools.codegraph.impl.resolve_codegraph_bin", return_value=None)
-def test_explore_no_binary(mock_resolve):
+@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=(None, "CodeGraph CLI is not installed or not on PATH."))
+def test_explore_no_binary(mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
@@ -64,8 +64,8 @@ def test_explore_no_binary(mock_resolve):
         assert "not installed" in observation.text.lower()
 
 
-@patch("openhands.tools.codegraph.impl.resolve_codegraph_bin", return_value="/usr/bin/codegraph")
-def test_explore_no_index(mock_resolve):
+@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=(None, "Run `codegraph init` in the project root before exploring."))
+def test_explore_no_index(mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
@@ -76,15 +76,17 @@ def test_explore_no_index(mock_resolve):
         assert "codegraph init" in observation.text.lower()
 
 
-@patch("openhands.tools.codegraph.impl.resolve_codegraph_bin", return_value="/usr/bin/codegraph")
-@patch("openhands.tools.codegraph.impl.subprocess.run")
-def test_explore_success(mock_run, mock_resolve):
+@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch("openhands.tools.codegraph.impl.run_codegraph_cli")
+def test_explore_success(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         (Path(temp_dir) / ".codegraph").mkdir()
-        mock_run.return_value = MagicMock(
+        from openhands.tools.codegraph.runner import CodeGraphRunResult
+
+        mock_run.return_value = CodeGraphRunResult(
+            text="class AuthService:\n    def login(self): ...",
+            is_error=False,
             returncode=0,
-            stdout="class AuthService:\n    def login(self): ...",
-            stderr="",
         )
 
         conv_state = _create_test_conv_state(temp_dir)
@@ -95,17 +97,22 @@ def test_explore_success(mock_run, mock_resolve):
         assert observation.is_error is False
         assert "AuthService" in observation.text
         mock_run.assert_called_once()
-        args, kwargs = mock_run.call_args
-        assert args[0] == ["/usr/bin/codegraph", "explore", "how does login work"]
-        assert kwargs["cwd"] == str(Path(temp_dir).resolve())
+        command = mock_run.call_args.kwargs["command"]
+        assert command == ["/usr/bin/codegraph", "explore", "how does login work"]
 
 
-@patch("openhands.tools.codegraph.impl.resolve_codegraph_bin", return_value="/usr/bin/codegraph")
-@patch("openhands.tools.codegraph.impl.subprocess.run")
-def test_explore_timeout(mock_run, mock_resolve):
+@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch("openhands.tools.codegraph.impl.run_codegraph_cli")
+def test_explore_timeout(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         (Path(temp_dir) / ".codegraph").mkdir()
-        mock_run.side_effect = subprocess.TimeoutExpired(cmd="codegraph", timeout=120)
+        from openhands.tools.codegraph.runner import CodeGraphRunResult
+
+        mock_run.return_value = CodeGraphRunResult(
+            text="CodeGraph explore timed out after 120 seconds.",
+            is_error=True,
+            returncode=None,
+        )
 
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
@@ -128,10 +135,15 @@ def test_default_tools_flag(monkeypatch):
     monkeypatch.delenv("OH_ENABLE_CODEGRAPH", raising=False)
     names = [tool.name for tool in get_default_tools(enable_browser=False)]
     assert "codegraph_explore" not in names
+    assert "list_callers" not in names
 
     monkeypatch.setenv("OH_ENABLE_CODEGRAPH", "true")
     names = [tool.name for tool in get_default_tools(enable_browser=False)]
     assert "codegraph_explore" in names
+    assert "go_to_definition" in names
+    assert "find_references" in names
+    assert "list_callers" in names
+    assert "list_callees" in names
 
 
 @pytest.mark.asyncio

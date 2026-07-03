@@ -43,9 +43,10 @@ def register_default_tools(enable_browser: bool = True) -> None:
         logger.debug(f"Tool: {BrowserToolSet.name} registered.")
 
     if _is_codegraph_enabled():
-        from openhands.tools.codegraph import CodegraphExploreTool
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
 
-        logger.debug(f"Tool: {CodegraphExploreTool.name} registered.")
+        for tool_cls in CODEGRAPH_TOOL_CLASSES:
+            logger.debug(f"Tool: {tool_cls.name} registered.")
 
 
 def get_default_tools(
@@ -80,9 +81,9 @@ def get_default_tools(
 
         tools.append(Tool(name=TaskToolSet.name))
     if _is_codegraph_enabled():
-        from openhands.tools.codegraph import CodegraphExploreTool
+        from openhands.tools.codegraph import CODEGRAPH_TOOL_CLASSES
 
-        tools.append(Tool(name=CodegraphExploreTool.name))
+        tools.extend(Tool(name=tool_cls.name) for tool_cls in CODEGRAPH_TOOL_CLASSES)
     return tools
 
 

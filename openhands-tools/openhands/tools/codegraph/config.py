@@ -51,7 +51,7 @@ def resolve_codegraph_bin() -> str | None:
     return None
 
 
-def get_explore_timeout_sec() -> int:
+def get_codegraph_timeout_sec() -> int:
     raw = os.getenv("CODEGRAPH_TIMEOUT_SEC")
     if not raw:
         return _DEFAULT_TIMEOUT_SEC
@@ -59,6 +59,11 @@ def get_explore_timeout_sec() -> int:
         return max(1, int(raw))
     except ValueError:
         return _DEFAULT_TIMEOUT_SEC
+
+
+def get_explore_timeout_sec() -> int:
+    """Backward-compatible alias for :func:`get_codegraph_timeout_sec`."""
+    return get_codegraph_timeout_sec()
 
 
 def get_init_timeout_sec() -> int:
