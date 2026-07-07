@@ -35,7 +35,9 @@ if TYPE_CHECKING:
 class GoToDefinitionAction(Action):
     """Schema for resolving a symbol definition."""
 
-    symbol: str = Field(description="Name of the function, method, class, or type to locate.")
+    symbol: str = Field(
+        description="Name of the function, method, class, or type to locate."
+    )
     file: str | None = Field(
         default=None,
         description="Optional file path or suffix to disambiguate overloaded symbols.",
@@ -63,7 +65,9 @@ TOOL_DESCRIPTION = """Jump to a symbol's definition via CodeGraph (``go_to_defin
 """
 
 
-class GoToDefinitionExecutor(ToolExecutor[GoToDefinitionAction, GoToDefinitionObservation]):
+class GoToDefinitionExecutor(
+    ToolExecutor[GoToDefinitionAction, GoToDefinitionObservation]
+):
     def __init__(self, working_dir: str):
         self.working_dir = Path(working_dir).resolve()
 
@@ -118,7 +122,9 @@ class GoToDefinitionExecutor(ToolExecutor[GoToDefinitionAction, GoToDefinitionOb
         )
 
 
-class GoToDefinitionTool(ToolDefinition[GoToDefinitionAction, GoToDefinitionObservation]):
+class GoToDefinitionTool(
+    ToolDefinition[GoToDefinitionAction, GoToDefinitionObservation]
+):
     @classmethod
     def create(cls, conv_state: ConversationState) -> Sequence[GoToDefinitionTool]:
         working_dir = conv_state.workspace.working_dir
@@ -127,8 +133,7 @@ class GoToDefinitionTool(ToolDefinition[GoToDefinitionAction, GoToDefinitionObse
 
         executor = GoToDefinitionExecutor(working_dir=working_dir)
         enhanced_description = (
-            f"{TOOL_DESCRIPTION}\n\n"
-            f"Your current working directory is: {working_dir}"
+            f"{TOOL_DESCRIPTION}\n\nYour current working directory is: {working_dir}"
         )
         return [
             cls(

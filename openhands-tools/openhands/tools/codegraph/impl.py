@@ -22,7 +22,9 @@ if TYPE_CHECKING:
     from openhands.sdk.conversation import LocalConversation
 
 
-class CodeGraphExploreExecutor(ToolExecutor[CodeGraphExploreAction, CodeGraphExploreObservation]):
+class CodeGraphExploreExecutor(
+    ToolExecutor[CodeGraphExploreAction, CodeGraphExploreObservation]
+):
     """Execute ``codegraph explore`` against a pre-built project index."""
 
     def __init__(self, working_dir: str):

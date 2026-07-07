@@ -105,7 +105,9 @@ def merge_find_references_output(symbol: str, results: list[CodeGraphRunResult])
     return "\n\n".join(sections)
 
 
-class FindReferencesExecutor(ToolExecutor[FindReferencesAction, FindReferencesObservation]):
+class FindReferencesExecutor(
+    ToolExecutor[FindReferencesAction, FindReferencesObservation]
+):
     def __init__(self, working_dir: str):
         self.working_dir = Path(working_dir).resolve()
 
@@ -181,7 +183,9 @@ class FindReferencesExecutor(ToolExecutor[FindReferencesAction, FindReferencesOb
         )
 
 
-class FindReferencesTool(ToolDefinition[FindReferencesAction, FindReferencesObservation]):
+class FindReferencesTool(
+    ToolDefinition[FindReferencesAction, FindReferencesObservation]
+):
     @classmethod
     def create(cls, conv_state: ConversationState) -> Sequence[FindReferencesTool]:
         working_dir = conv_state.workspace.working_dir
@@ -190,8 +194,7 @@ class FindReferencesTool(ToolDefinition[FindReferencesAction, FindReferencesObse
 
         executor = FindReferencesExecutor(working_dir=working_dir)
         enhanced_description = (
-            f"{TOOL_DESCRIPTION}\n\n"
-            f"Your current working directory is: {working_dir}"
+            f"{TOOL_DESCRIPTION}\n\nYour current working directory is: {working_dir}"
         )
         return [
             cls(

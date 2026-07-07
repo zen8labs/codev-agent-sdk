@@ -35,7 +35,9 @@ if TYPE_CHECKING:
 class ListCallersAction(Action):
     """Schema for listing callers of a symbol."""
 
-    symbol: str = Field(description="Name of the function, method, or class to inspect.")
+    symbol: str = Field(
+        description="Name of the function, method, or class to inspect."
+    )
     limit: int = Field(default=20, description="Maximum number of callers to return.")
     cwd: str | None = Field(
         default=None,
@@ -124,8 +126,7 @@ class ListCallersTool(ToolDefinition[ListCallersAction, ListCallersObservation])
 
         executor = ListCallersExecutor(working_dir=working_dir)
         enhanced_description = (
-            f"{TOOL_DESCRIPTION}\n\n"
-            f"Your current working directory is: {working_dir}"
+            f"{TOOL_DESCRIPTION}\n\nYour current working directory is: {working_dir}"
         )
         return [
             cls(
@@ -145,9 +146,7 @@ class ListCallersTool(ToolDefinition[ListCallersAction, ListCallersObservation])
 
     def declared_resources(self, action: Action) -> DeclaredResources:
         if not isinstance(action, ListCallersAction):
-            raise TypeError(
-                f"Expected ListCallersAction, got {type(action).__name__}"
-            )
+            raise TypeError(f"Expected ListCallersAction, got {type(action).__name__}")
         return DeclaredResources(keys=(), declared=True)
 
 

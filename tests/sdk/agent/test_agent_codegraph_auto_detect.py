@@ -43,7 +43,7 @@ def _make_llm() -> LLM:
     ],
 )
 def test_codegraph_auto_detect(tools, prompt_kwargs, expect_codegraph):
-    """enable_codegraph is inferred from tools in static_system_message (like browser)."""
+    """enable_codegraph inferred from tools in static_system_message (like browser)."""
     agent = Agent(llm=_make_llm(), tools=tools, system_prompt_kwargs=prompt_kwargs)
     msg = agent.static_system_message
     if expect_codegraph:

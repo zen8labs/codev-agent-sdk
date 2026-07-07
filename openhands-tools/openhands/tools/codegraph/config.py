@@ -6,6 +6,7 @@ import os
 import shutil
 from pathlib import Path
 
+
 CODEGRAPH_INDEX_DIR = ".codegraph"
 
 _DEFAULT_TIMEOUT_SEC = 120

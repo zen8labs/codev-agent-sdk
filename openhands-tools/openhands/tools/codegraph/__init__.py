@@ -16,15 +16,15 @@ from openhands.tools.codegraph.navigation_go_to_definition import (
     GoToDefinitionObservation,
     GoToDefinitionTool,
 )
-from openhands.tools.codegraph.navigation_list_callers import (
-    ListCallersAction,
-    ListCallersObservation,
-    ListCallersTool,
-)
 from openhands.tools.codegraph.navigation_list_callees import (
     ListCalleesAction,
     ListCalleesObservation,
     ListCalleesTool,
+)
+from openhands.tools.codegraph.navigation_list_callers import (
+    ListCallersAction,
+    ListCallersObservation,
+    ListCallersTool,
 )
 
 

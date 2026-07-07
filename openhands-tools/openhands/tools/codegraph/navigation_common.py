@@ -7,7 +7,9 @@ from pathlib import Path
 from openhands.tools.codegraph.config import has_codegraph_index, resolve_codegraph_bin
 
 
-def resolve_search_path(working_dir: Path, cwd: str | None) -> tuple[Path | None, str | None]:
+def resolve_search_path(
+    working_dir: Path, cwd: str | None
+) -> tuple[Path | None, str | None]:
     """Resolve the project search path, returning an error message on failure."""
     if cwd:
         search_path = Path(cwd).resolve()
@@ -37,7 +39,9 @@ def validate_codegraph_prerequisites(
     return binary, None
 
 
-def append_path_flag(command: list[str], search_path: Path, working_dir: Path) -> list[str]:
+def append_path_flag(
+    command: list[str], search_path: Path, working_dir: Path
+) -> list[str]:
     """Add ``-p`` when the search path differs from the executor working dir."""
     if search_path != working_dir:
         return [*command, "-p", str(search_path)]

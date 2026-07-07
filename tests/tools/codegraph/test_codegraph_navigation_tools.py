@@ -1,9 +1,8 @@
 """Tests for CodeGraph navigation tools."""
 
-import subprocess
 import tempfile
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -19,10 +18,10 @@ from openhands.tools.codegraph import (
     FindReferencesTool,
     GoToDefinitionAction,
     GoToDefinitionTool,
-    ListCallersAction,
-    ListCallersTool,
     ListCalleesAction,
     ListCalleesTool,
+    ListCallersAction,
+    ListCallersTool,
 )
 from openhands.tools.codegraph.navigation_find_references import (
     FIND_REFERENCES_DISCLAIMER,
@@ -60,20 +59,28 @@ def test_navigation_tool_initialization(tool_cls, action_cls, expected_name):
         assert tool.name == expected_name
         assert tool.executor is not None
         action = action_cls(symbol="AuthService")
+        assert tool.executor is not None
         observation = tool.executor(action)
         assert observation.is_error is True
 
 
-@patch("openhands.tools.codegraph.navigation_go_to_definition.validate_codegraph_prerequisites", return_value=(None, "CLI not installed"))
+@patch(
+    "openhands.tools.codegraph.navigation_go_to_definition.validate_codegraph_prerequisites",
+    return_value=(None, "CLI not installed"),
+)
 def test_go_to_definition_no_binary(mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         tool = GoToDefinitionTool.create(_create_test_conv_state(temp_dir))[0]
+        assert tool.executor is not None
         observation = tool.executor(GoToDefinitionAction(symbol="AuthService"))
         assert observation.is_error is True
         assert "not installed" in observation.text.lower()
 
 
-@patch("openhands.tools.codegraph.navigation_list_callers.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.navigation_list_callers.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.navigation_list_callers.run_codegraph_cli")
 def test_list_callers_success(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -85,9 +92,8 @@ def test_list_callers_success(mock_run, mock_validate):
         )
 
         tool = ListCallersTool.create(_create_test_conv_state(temp_dir))[0]
-        observation = tool.executor(
-            ListCallersAction(symbol="login", limit=10)
-        )
+        assert tool.executor is not None
+        observation = tool.executor(ListCallersAction(symbol="login", limit=10))
 
         assert observation.is_error is False
         mock_run.assert_called_once()
@@ -96,7 +102,10 @@ def test_list_callers_success(mock_run, mock_validate):
         assert "-l" in command and "10" in command
 
 
-@patch("openhands.tools.codegraph.navigation_list_callees.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.navigation_list_callees.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.navigation_list_callees.run_codegraph_cli")
 def test_list_callees_success(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -108,6 +117,7 @@ def test_list_callees_success(mock_run, mock_validate):
         )
 
         tool = ListCalleesTool.create(_create_test_conv_state(temp_dir))[0]
+        assert tool.executor is not None
         observation = tool.executor(ListCalleesAction(symbol="login"))
 
         assert observation.is_error is False
@@ -115,7 +125,10 @@ def test_list_callees_success(mock_run, mock_validate):
         assert command[:3] == ["/usr/bin/codegraph", "callees", "login"]
 
 
-@patch("openhands.tools.codegraph.navigation_go_to_definition.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.navigation_go_to_definition.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.navigation_go_to_definition.run_codegraph_cli")
 def test_go_to_definition_with_file(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -127,6 +140,7 @@ def test_go_to_definition_with_file(mock_run, mock_validate):
         )
 
         tool = GoToDefinitionTool.create(_create_test_conv_state(temp_dir))[0]
+        assert tool.executor is not None
         observation = tool.executor(
             GoToDefinitionAction(symbol="AuthService", file="src/auth.py")
         )
@@ -142,7 +156,10 @@ def test_go_to_definition_with_file(mock_run, mock_validate):
         ]
 
 
-@patch("openhands.tools.codegraph.navigation_find_references.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.navigation_find_references.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.navigation_find_references.run_codegraph_cli_batch")
 def test_find_references_runs_three_commands(mock_batch, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -154,6 +171,7 @@ def test_find_references_runs_three_commands(mock_batch, mock_validate):
         ]
 
         tool = FindReferencesTool.create(_create_test_conv_state(temp_dir))[0]
+        assert tool.executor is not None
         observation = tool.executor(FindReferencesAction(symbol="AuthService"))
 
         assert observation.is_error is False
@@ -169,7 +187,10 @@ def test_find_references_runs_three_commands(mock_batch, mock_validate):
         assert SECTION_QUERY in observation.text
 
 
-@patch("openhands.tools.codegraph.navigation_find_references.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.navigation_find_references.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.navigation_find_references.run_codegraph_cli_batch")
 def test_find_references_partial_failure(mock_batch, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -181,6 +202,7 @@ def test_find_references_partial_failure(mock_batch, mock_validate):
         ]
 
         tool = FindReferencesTool.create(_create_test_conv_state(temp_dir))[0]
+        assert tool.executor is not None
         observation = tool.executor(FindReferencesAction(symbol="AuthService"))
 
         assert observation.is_error is False

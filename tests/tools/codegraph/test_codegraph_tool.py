@@ -1,7 +1,5 @@
 """Tests for CodeGraph explore tool."""
 
-import os
-import subprocess
 import tempfile
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -51,12 +49,16 @@ def test_codegraph_tool_invalid_working_dir():
         CodegraphExploreTool.create(conv_state)
 
 
-@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=(None, "CodeGraph CLI is not installed or not on PATH."))
+@patch(
+    "openhands.tools.codegraph.impl.validate_codegraph_prerequisites",
+    return_value=(None, "CodeGraph CLI is not installed or not on PATH."),
+)
 def test_explore_no_binary(mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
         action = CodeGraphExploreAction(query="how does auth work")
+        assert tool.executor is not None
         observation = tool.executor(action)
 
         assert isinstance(observation, CodeGraphExploreObservation)
@@ -64,19 +66,26 @@ def test_explore_no_binary(mock_validate):
         assert "not installed" in observation.text.lower()
 
 
-@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=(None, "Run `codegraph init` in the project root before exploring."))
+@patch(
+    "openhands.tools.codegraph.impl.validate_codegraph_prerequisites",
+    return_value=(None, "Run `codegraph init` in the project root before exploring."),
+)
 def test_explore_no_index(mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
         action = CodeGraphExploreAction(query="how does auth work")
+        assert tool.executor is not None
         observation = tool.executor(action)
 
         assert observation.is_error is True
         assert "codegraph init" in observation.text.lower()
 
 
-@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.impl.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.impl.run_codegraph_cli")
 def test_explore_success(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -92,6 +101,7 @@ def test_explore_success(mock_run, mock_validate):
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
         action = CodeGraphExploreAction(query="how does login work")
+        assert tool.executor is not None
         observation = tool.executor(action)
 
         assert observation.is_error is False
@@ -101,7 +111,10 @@ def test_explore_success(mock_run, mock_validate):
         assert command == ["/usr/bin/codegraph", "explore", "how does login work"]
 
 
-@patch("openhands.tools.codegraph.impl.validate_codegraph_prerequisites", return_value=("/usr/bin/codegraph", None))
+@patch(
+    "openhands.tools.codegraph.impl.validate_codegraph_prerequisites",
+    return_value=("/usr/bin/codegraph", None),
+)
 @patch("openhands.tools.codegraph.impl.run_codegraph_cli")
 def test_explore_timeout(mock_run, mock_validate):
     with tempfile.TemporaryDirectory() as temp_dir:
@@ -116,6 +129,7 @@ def test_explore_timeout(mock_run, mock_validate):
 
         conv_state = _create_test_conv_state(temp_dir)
         tool = CodegraphExploreTool.create(conv_state)[0]
+        assert tool.executor is not None
         observation = tool.executor(CodeGraphExploreAction(query="trace flow"))
 
         assert observation.is_error is True

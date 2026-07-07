@@ -60,7 +60,9 @@ TOOL_DESCRIPTION = """Semantic code exploration via CodeGraph (tool name: ``code
 """
 
 
-class CodegraphExploreTool(ToolDefinition[CodeGraphExploreAction, CodeGraphExploreObservation]):
+class CodegraphExploreTool(
+    ToolDefinition[CodeGraphExploreAction, CodeGraphExploreObservation]
+):
     """Tool that wraps ``codegraph explore`` for agent use."""
 
     def declared_resources(self, action: Action) -> DeclaredResources:

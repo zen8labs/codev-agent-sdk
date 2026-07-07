@@ -73,6 +73,9 @@ extend-select = ["B006", "B008", "B039", "RUF012"]
 [tool.ruff.lint.per-file-ignores]
 # Test files often have unused arguments (fixtures, mocks, interface implementations)
 "tests/**/*.py" = ["ARG"]
+# CodeGraph tool descriptions use long lines in triple-quoted strings
+# that cannot be wrapped or have # noqa appended inside the string
+"openhands-tools/openhands/tools/codegraph/**/*.py" = ["E501"]
 
 
 # Allowlist safe default calls for flake8-bugbear rules (e.g., FastAPI Depends)

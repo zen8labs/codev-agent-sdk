@@ -35,7 +35,9 @@ if TYPE_CHECKING:
 class ListCalleesAction(Action):
     """Schema for listing callees of a symbol."""
 
-    symbol: str = Field(description="Name of the function, method, or class to inspect.")
+    symbol: str = Field(
+        description="Name of the function, method, or class to inspect."
+    )
     limit: int = Field(default=20, description="Maximum number of callees to return.")
     cwd: str | None = Field(
         default=None,
@@ -124,8 +126,7 @@ class ListCalleesTool(ToolDefinition[ListCalleesAction, ListCalleesObservation])
 
         executor = ListCalleesExecutor(working_dir=working_dir)
         enhanced_description = (
-            f"{TOOL_DESCRIPTION}\n\n"
-            f"Your current working directory is: {working_dir}"
+            f"{TOOL_DESCRIPTION}\n\nYour current working directory is: {working_dir}"
         )
         return [
             cls(
@@ -145,9 +146,7 @@ class ListCalleesTool(ToolDefinition[ListCalleesAction, ListCalleesObservation])
 
     def declared_resources(self, action: Action) -> DeclaredResources:
         if not isinstance(action, ListCalleesAction):
-            raise TypeError(
-                f"Expected ListCalleesAction, got {type(action).__name__}"
-            )
+            raise TypeError(f"Expected ListCalleesAction, got {type(action).__name__}")
         return DeclaredResources(keys=(), declared=True)
 
 
